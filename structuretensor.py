@@ -33,8 +33,8 @@ class StructureTensor(object):
 
         with np.errstate(invalid='ignore'):
             if metric == 'westin':
-                self.AI = np.where(t1 != 0, (t2 - t3) / t1), np.zeros_like(t1)
-            else:
+                self.AI = np.where(t1 != 0, (t2 - t3) / t1, np.zeros_like(t1))
+            elif metric == 'fa':
                 norm2 = t1**2 + t2**2 + t3**2
                 self.AI = np.where(norm2 != 0,
                                    np.sqrt(((t1 - t2)**2 +
@@ -44,8 +44,8 @@ class StructureTensor(object):
 
         return self.AI
 
-    def st_results(self, metric='westin'):
+    def results(self, metric='westin'):
         '''
         Quick method to return anisotropy index and orientation vectors
         '''
-        return self.get_anisotropy_index(metric='westin'), self.get_orientations()
+        return self.get_anisotropy_index(metric=metric), self.get_orientations()
