@@ -36,10 +36,8 @@ def save_vtu(fn, vectors, AI):
 
     p, r, c = make_prc(vectors)
     u, v, w = split_comps(vectors)
-    r = make_rgb(u)
-    g = make_rgb(v)
-    b = make_rgb(w)
+    R, G, B = split_comps(make_rgb(vectors, scalar=AI, maxperc=95))
 
     pointsToVTK(fn,
-                p.astype('float'), r.astype('float'), c.astype('float'),
-                data={'uvw': (u, v, w), 'FA': AI, 'rgb': (r, g, b)})
+                c.astype('float'), r.astype('float'), p.astype('float'),
+                data={'uvw': (u, v, w), 'FA': AI, 'rgb': (R, G, B)})
