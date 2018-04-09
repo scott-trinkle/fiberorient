@@ -162,4 +162,17 @@ def make_ODF(n, vectors):
     # Scale by bin count
     x, y, z = [i * s for i in [x, y, z]]
 
-    return x, y, z, s
+    return x, y, z
+
+
+def colormap(x, y, z):
+    colors = np.stack((make_rgb(x.flatten()),
+                       make_rgb(y.flatten()),
+                       make_rgb(z.flatten()),
+                       255 * np.ones(x.size)),  # alpha = 255
+                      axis=1).astype(np.uint8)
+
+    # scalar identifier for each point
+    s = np.arange(x.flatten().size).reshape(x.shape)
+
+    return colors, s
