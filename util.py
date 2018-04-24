@@ -1,6 +1,6 @@
 import numpy as np
-from scipy import ndimage as ndi
-from skimage import io
+from scipy.ndimage import gaussian_filter
+from skimage import io, img_as_float
 
 
 def structure_tensor_eig(im, d_sigma=1, n_sigma=1, mode='constant', cval=0):
@@ -28,16 +28,19 @@ def structure_tensor(image, d_sigma=1, n_sigma=1, mode='constant', cval=0):
     Computes the structure tensor elements
     """
 
+    image = np.squeeze(image)
+    image = img_as_float(image)  # prevents overflow for uint8 xray data
+
     imp, imr, imc = compute_derivatives(
         image, d_sigma=d_sigma, mode=mode, cval=cval)
 
     # structure tensor
-    Spp = ndi.gaussian_filter(imp * imp, n_sigma, mode=mode, cval=cval)
-    Spr = ndi.gaussian_filter(imp * imr, n_sigma, mode=mode, cval=cval)
-    Spc = ndi.gaussian_filter(imp * imc, n_sigma, mode=mode, cval=cval)
-    Srr = ndi.gaussian_filter(imr * imr, n_sigma, mode=mode, cval=cval)
-    Src = ndi.gaussian_filter(imr * imc, n_sigma, mode=mode, cval=cval)
-    Scc = ndi.gaussian_filter(imc * imc, n_sigma, mode=mode, cval=cval)
+    Spp = gaussian_filter(imp * imp, n_sigma, mode=mode, cval=cval)
+    Spr = gaussian_filter(imp * imr, n_sigma, mode=mode, cval=cval)
+    Spc = gaussian_filter(imp * imc, n_sigma, mode=mode, cval=cval)
+    Srr = gaussian_filter(imr * imr, n_sigma, mode=mode, cval=cval)
+    Src = gaussian_filter(imr * imc, n_sigma, mode=mode, cval=cval)
+    Scc = gaussian_filter(imc * imc, n_sigma, mode=mode, cval=cval)
 
     return Spp, Spr, Spc, Srr, Src, Scc
 
@@ -64,11 +67,11 @@ def compute_derivatives(image, d_sigma=1.0, mode='constant', cval=0):
     with Gaussian partial derivatives
     """
 
-    imp = ndi.gaussian_filter(
+    imp = gaussian_filter(
         image, d_sigma, order=[1, 0, 0], mode=mode, cval=cval)
-    imr = ndi.gaussian_filter(
+    imr = gaussian_filter(
         image, d_sigma, order=[0, 1, 0], mode=mode, cval=cval)
-    imc = ndi.gaussian_filter(
+    imc = gaussian_filter(
         image, d_sigma, order=[0, 0, 1], mode=mode, cval=cval)
 
     return imp, imr, imc
