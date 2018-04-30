@@ -3,7 +3,7 @@ from scipy.ndimage import gaussian_filter
 from skimage import io, img_as_float
 
 
-def structure_tensor_eig(im, d_sigma=1, n_sigma=1, mode='constant', cval=0):
+def structure_tensor_eig(im, d_sigma=1, n_sigma=1, mode='nearest', cval=0):
     '''
     Returns the eigenvalues and eigenvectors of the structure tensor
     for an image.
@@ -23,7 +23,7 @@ def structure_tensor_eig(im, d_sigma=1, n_sigma=1, mode='constant', cval=0):
     return evals, evectors
 
 
-def structure_tensor(image, d_sigma=1, n_sigma=1, mode='constant', cval=0):
+def structure_tensor(image, d_sigma=1, n_sigma=1, mode='nearest', cval=0):
     """
     Computes the structure tensor elements
     """
@@ -61,7 +61,7 @@ def rescale(a, scale=1.0, dtype=None, maxperc=None):
     return (scale * (shifted / shifted.max())).astype(dtype)
 
 
-def compute_derivatives(image, d_sigma=1.0, mode='constant', cval=0):
+def compute_derivatives(image, d_sigma=1.0, mode='nearest', cval=0):
     """
     Compute derivatives in row, column and plane directions using convolution
     with Gaussian partial derivatives

@@ -4,7 +4,7 @@ from .util import structure_tensor_eig
 
 class StructureTensor(object):
     def __init__(self, im, d_sigma=1.0, n_sigma=1.0,
-                 gaussmode='constant', cval=0):
+                 gaussmode='nearest', cval=0):
         self.evals, self.evectors = structure_tensor_eig(im=im,
                                                          d_sigma=d_sigma,
                                                          n_sigma=n_sigma,
