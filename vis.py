@@ -1,6 +1,5 @@
 import sys
-import numpy as np
-from .util import split_comps, make_rgb, make_prc, make_ODF, colormap
+from .util import (split_comps, make_rgb, make_xyz)
 
 
 def plot_field(vectors, scalars, lw=2.0, sf=0.5, cm='jet', colorbar=False):
@@ -12,10 +11,10 @@ def plot_field(vectors, scalars, lw=2.0, sf=0.5, cm='jet', colorbar=False):
 
     import mayavi.mlab as m
 
-    p, r, c = make_prc(vectors)
+    z, y, x = make_xyz(vectors)
     u, v, w = split_comps(vectors)
-    field = m.quiver3d(p, r, c,
-                       u, v, w,
+    field = m.quiver3d(x, y, z,
+                       w, v, u,
                        scalars=scalars,
                        line_width=lw,
                        scale_factor=sf,
@@ -35,44 +34,37 @@ def save_vtu(fn, vectors, AI):
 
     from pyevtk.hl import pointsToVTK
 
-    p, r, c = make_prc(vectors)
-    u, v, w = split_comps(vectors)
+    z, y, x = make_xyz(vectors)
+    w, v, u = split_comps(vectors)
     R, G, B = split_comps(make_rgb(vectors, scalar=AI, maxperc=95))
 
     pointsToVTK(fn,
-                c.astype('float'), r.astype('float'), p.astype('float'),
+                x.astype('float'), y.astype('float'), z.astype('float'),
                 data={'uvw': (u, v, w), 'FA': AI, 'rgb': (R, G, B)})
 
 
-def plot_ODF(vectors, n=400, scalar=None, fignum=1, save=False, fn=None):
-
-    from mayavi import mlab
-    mlab.close(fignum)
-
-    if scalar is not None:
-        print('scalar is not none')
-        if scalar.ndim != vectors.ndim:
-            print('scalar and vector have different dims')
-            data = vectors * np.expand_dims(scalar, -1)
-        else:
-            print('scalar and vectors do NOT have different dims')
-            data = vectors * scalar
-    else:
-        print('Scalar is none')
-        data = vectors
-
-    x, y, z = make_ODF(n, data)
-    colors, s = colormap(x, y, z)
-    fig = mlab.figure(fignum,
-                      bgcolor=(1, 1, 1),
-                      fgcolor=(0, 0, 0),
-                      size=(1920, 1080))
-    ODF = mlab.mesh(x, y, z, scalars=s)
-    ODF.module_manager.scalar_lut_manager.lut.table = colors
-    mlab.outline()
-    mlab.orientation_axes()
-
+def show_ODF(odf, sphere, interactive=True, save=False,
+             fn=None, ax_scale=1.5):
+    from dipy.viz import actor, window
+    ren = window.Renderer()
+    odf_actor = actor.odf_slicer(odf.reshape((1, 1, 1, -1)), sphere=sphere)
+    axes = actor.axes(scale=(ax_scale, ax_scale, ax_scale))
+    ren.add(odf_actor, axes)
+    if interactive:
+        window.show(ren)
     if save:
-        mlab.savefig(fn)
+        window.record(ren, out_path=fn, size=(1200, 1200))
 
-    return fig
+
+def show_peaks(dirs, vals, sphere, interactive=True, save=False,
+               fn=None, ax_scale=0.5):
+    from dipy.viz import actor, window
+    ren = window.Renderer()
+    peaks_actor = actor.peak_slicer(dirs, vals)
+    axes = actor.axes(scale=(ax_scale, ax_scale, ax_scale))
+    ren.add(peaks_actor, axes)
+
+    if interactive:
+        window.show(ren)
+    if save:
+        window.record(ren, out_path=fn, size=(1200, 1200))
