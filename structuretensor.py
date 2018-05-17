@@ -21,7 +21,7 @@ class StructureTensor(object):
         self.orientations = self.evectors[..., 0]
         return self.orientations
 
-    def get_anisotropy_index(self, metric='westin'):
+    def get_anisotropy_index(self, metric='fa'):
         '''
         Calculates fractional anisotropy image from the eigenvalues image.
         Eigenvalues are ordered from smallest to largest, so t1 > t2 > t3.
@@ -44,7 +44,7 @@ class StructureTensor(object):
 
         return self.AI
 
-    def results(self, metric='westin'):
+    def results(self, metric='fa'):
         '''
         Quick method to return anisotropy index and orientation vectors
         '''
