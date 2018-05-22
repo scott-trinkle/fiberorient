@@ -6,7 +6,7 @@ from skimage import img_as_float
 class StructureTensor(object):
     def __init__(self, im, d_sigma=2.5, n_sigma=5.0,
                  gaussmode='nearest', cval=0):
-        self.evals, self.evectors = structure_tensor_eig(im=im,
+        self.evals, self.evectors = structure_tensor_eig(image=im,
                                                          d_sigma=d_sigma,
                                                          n_sigma=n_sigma,
                                                          mode=gaussmode,

@@ -2,6 +2,7 @@ import math
 import numpy as np
 from scipy.special import sph_harm
 from dipy.core.sphere import Sphere
+from dipy.direction.peaks import peak_directions
 from .util import split_comps
 
 
@@ -22,7 +23,7 @@ def make_sphere(n):
     return sphere
 
 
-def get_directions(vectors):
+def vectors_to_spherical(vectors):
     '''
     Takes [...,3] ndarray of vectors and returns flat lists of
     theta and phi values in spherical coordinates.
@@ -37,14 +38,20 @@ def get_directions(vectors):
     phi = np.arctan2(vy, vx)
     phi[phi < 0] += 2 * np.pi  # sph_harm functions require phi in [0,2pi]
 
-    return theta.flatten(), phi.flatten()
+    return theta, phi
 
 
-def get_SH_loop_ind(order):
+def check_degree(degree):
+    if degree % 2 != 0:
+        raise ValueError('SH Degree must be even')
+
+
+def get_SH_loop_ind(degree):
     '''
     Get indices for looping the even-n, positive-m SHs
     '''
-    mn = [(m, n) for n in range(0, order + 1, 2)
+    check_degree(degree)
+    mn = [(m, n) for n in range(0, degree + 1, 2)
           for m in range(0, n + 1)]
     return mn
 
@@ -66,9 +73,9 @@ def real_sph_harm(m, n, theta, phi):
         return sh.real
 
 
-def get_SH_coeffs(order, theta, phi):
+def get_SH_coeffs(degree, theta, phi):
     '''
-    Calculate even-ordered SH coefficients up to 'order'
+    Calculate even-degree SH coefficients up to 'degree'
     Order of output is given by:
 
     (n, m)
@@ -84,7 +91,8 @@ def get_SH_coeffs(order, theta, phi):
       .
       .
     '''
-    mn = get_SH_loop_ind(order)
+    check_degree(degree)
+    mn = get_SH_loop_ind(degree)
     c = []
     app = c.append
     K = theta.size
@@ -104,8 +112,8 @@ def get_odf(coeffs, sphere):
     Calculates odf as linear combination of real SH using coeffs,
     evaluated on sample points defined by sphere.
     '''
-    order = int((math.sqrt(8 * len(coeffs) + 1) - 3) // 2)
-    mn = get_SH_loop_ind(order)
+    degree = int((math.sqrt(8 * len(coeffs) + 1) - 3) // 2)
+    mn = get_SH_loop_ind(degree)
     odf = np.zeros(sphere.phi.size)
     i = 0
     for m, n in mn:
@@ -119,3 +127,35 @@ def get_odf(coeffs, sphere):
             odf += coeffs[i] * Y_pos
             i += 1
     return odf
+
+
+def get_peaks(odf, sphere, threshold=0.2, minsep=10):
+    dirs, vals, inds = peak_directions(odf, sphere,
+                                       relative_peak_threshold=threshold,
+                                       min_separation_angle=minsep)
+    return dirs, vals, inds
+
+
+def prep_dirs(dirs):
+    # Takes in Nx3 array of direction coordinates
+    # makes all x-coordinates positive and sorts by x-coordinate
+    dirs[dirs[..., 0] < 0] *= -1  # make all x's positive
+    if dirs.ndim > 1:
+        dirs = dirs[dirs[..., 0].argsort()]  # sort by x
+    return dirs
+
+
+def get_ang_distance(dirs0, dirs1):
+    # Takes two direction coordinate arrays and returns angular distance
+    # between each unique direction
+
+    # Sort peaks
+    dirs0 = prep_dirs(dirs0)
+    dirs1 = prep_dirs(dirs1)
+
+    # Calculate angle in degrees
+    ang = np.arccos((dirs0 * dirs1).sum(axis=-1)) * 180 / np.pi
+
+    # Restrict to being between 0-90 degrees
+    ang = np.where(ang > 90, 180 - ang, ang)
+    return ang
