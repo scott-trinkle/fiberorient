@@ -23,7 +23,7 @@ def make_sphere(n):
     return sphere
 
 
-def vectors_to_spherical(vectors):
+def cart_to_spherical(vectors):
     '''
     Takes [...,3] ndarray of vectors and returns flat lists of
     theta and phi values in spherical coordinates.
