@@ -126,6 +126,7 @@ def get_odf(coeffs, sphere):
             i += 1
             odf += coeffs[i] * Y_pos
             i += 1
+    odf = np.clip(odf, 1e-16, odf.max())
     return odf
 
 
@@ -159,3 +160,28 @@ def get_ang_distance(dirs0, dirs1):
     # Restrict to being between 0-90 degrees
     ang = np.where(ang > 90, 180 - ang, ang)
     return ang
+
+
+def calc_ACC(c1, c2):
+    '''
+    Takes in two SH coefficients and calculates the
+    angular correlation coefficient 
+    '''
+
+    c1_norm = np.sqrt((abs(c1)**2).sum())
+    c2_norm = np.sqrt((abs(c2)**2).sum())
+
+    ACC = (c1 * c2).sum() / (c1_norm * c2_norm)
+    return ACC
+
+
+def calc_JSD(c1, c2, sphere):
+    P = get_odf(c1, sphere)
+    P /= P.sum()
+    Q = get_odf(c2, sphere)
+    Q /= Q.sum()
+    M = (P + Q) / 2
+    D_PM = (P * np.log(P / M)).sum()
+    D_QM = (Q * np.log(Q / M)).sum()
+    JSD = (D_PM + D_QM) / 2
+    return JSD
