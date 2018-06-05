@@ -4,7 +4,7 @@ from skimage import img_as_float
 
 
 class StructureTensor(object):
-    def __init__(self, im, d_sigma=2.5, n_sigma=5.0,
+    def __init__(self, im, d_sigma=7.5 / 1.2, n_sigma=6.5 / 1.2,
                  gaussmode='nearest', cval=0):
         self.evals, self.evectors = structure_tensor_eig(image=im,
                                                          d_sigma=d_sigma,
@@ -52,7 +52,7 @@ class StructureTensor(object):
         return self.get_anisotropy_index(metric=metric), self.get_orientations()
 
 
-def structure_tensor_eig(image, d_sigma=2.5, n_sigma=5,
+def structure_tensor_eig(image, d_sigma=7.5 / 1.2, n_sigma=6.5 / 1.2,
                          mode='nearest', cval=0):
     '''
     Returns the eigenvalues and eigenvectors of the structure tensor
@@ -73,7 +73,7 @@ def structure_tensor_eig(image, d_sigma=2.5, n_sigma=5,
     return evals, evectors
 
 
-def structure_tensor_elements(image, d_sigma=2.5, n_sigma=5,
+def structure_tensor_elements(image, d_sigma=7.5 / 1.2, n_sigma=6.5 / 1.2,
                               mode='nearest', cval=0):
     """
     Computes the structure tensor elements
@@ -96,7 +96,7 @@ def structure_tensor_elements(image, d_sigma=2.5, n_sigma=5,
     return Szz, Szy, Szx, Syy, Syx, Sxx
 
 
-def compute_derivatives(image, d_sigma=2.5, mode='nearest', cval=0):
+def compute_derivatives(image, d_sigma=7.5 / 1.2, mode='nearest', cval=0):
     """
     Compute derivatives in row, column and plane directions using convolution
     with Gaussian partial derivatives

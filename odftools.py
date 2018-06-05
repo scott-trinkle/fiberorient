@@ -23,7 +23,7 @@ def make_sphere(n):
     return sphere
 
 
-def cart_to_spherical(vectors):
+def cart_to_spherical(vectors, FA=None, threshold=0.69):
     '''
     Takes [...,3] ndarray of vectors and returns flat lists of
     theta and phi values in spherical coordinates.
@@ -32,6 +32,9 @@ def cart_to_spherical(vectors):
     theta is in [0, pi]
     phi is in [0, 2pi]
     '''
+    if FA is not None:
+        vectors = vectors[FA > threshold]
+
     vz, vy, vx = split_comps(vectors)
     r = np.sqrt(vz**2 + vy**2 + vx**2)
     theta = np.arccos(vz / r)
