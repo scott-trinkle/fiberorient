@@ -17,6 +17,21 @@ def imsave(fn, im, rgb=False, scalar=None,
     io.imsave(fn, im)
 
 
+def read_tif_stack(base, start=0, stop=10000):
+    im = []
+    app = im.append
+    for i in range(start, stop+1):
+        fn = base + '{:0>4d}'.format(i) + '.tif'
+        try:
+            temp = imread(fn)
+            app(temp)
+        except FileNotFoundError:
+            if i == start:
+                raise ValueError('Choose a higher start index.')
+            break
+    return np.array(im)
+
+
 def rescale(a, scale=1.0, dtype=None, maxperc=None):
     '''
     Rescales an array to 0-scale

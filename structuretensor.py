@@ -3,8 +3,8 @@ from scipy.ndimage import gaussian_filter
 from skimage import img_as_float
 
 
-class StructureTensor(object):
-    def __init__(self, im, d_sigma=7.5 / 1.2, n_sigma=6.5 / 1.2,
+class StruutilctureTensor(object):
+    def __init__(self, im, d_sigma=15.0 / 2.4, n_sigma=13 / 2.4,
                  gaussmode='nearest', cval=0):
         self.evals, self.evectors = structure_tensor_eig(image=im,
                                                          d_sigma=d_sigma,
