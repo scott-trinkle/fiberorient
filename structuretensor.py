@@ -6,21 +6,11 @@ from skimage import img_as_float
 class StructureTensor(object):
     def __init__(self, im, d_sigma=15.0 / 2.4, n_sigma=13 / 2.4,
                  gaussmode='nearest', cval=0):
-        self.evals, self.evectors = structure_tensor_eig(image=im,
-                                                         d_sigma=d_sigma,
-                                                         n_sigma=n_sigma,
-                                                         mode=gaussmode,
-                                                         cval=cval)
-
-    def get_orientations(self):
-        '''
-        Returns principal orientation vector from a 3D volume
-        using the structure tensor.
-        '''
-
-        # taking vector w/ smallest eval
-        self.orientations = self.evectors[..., 0]
-        return self.orientations
+        self.evals, self.orientations = structure_tensor_eig(image=im,
+                                                             d_sigma=d_sigma,
+                                                             n_sigma=n_sigma,
+                                                             mode=gaussmode,
+                                                             cval=cval)
 
     def get_anisotropy_index(self, metric='fa'):
         '''
@@ -28,28 +18,30 @@ class StructureTensor(object):
         Eigenvalues are ordered from smallest to largest, so t1 > t2 > t3.
         '''
 
-        t1 = self.evals[..., 2]  # largest
-        t2 = self.evals[..., 1]  # middle
-        t3 = self.evals[..., 0]  # smallest
+        # t1 = self.evals[..., 2]  # largest
+        # t2 = self.evals[..., 1]  # middle
+        # t3 = self.evals[..., 0]  # smallest
 
         with np.errstate(invalid='ignore'):
             if metric == 'westin':
-                self.AI = np.where(t1 != 0, (t2 - t3) / t1, np.zeros_like(t1))
+                AI = np.where(self.evals[..., 2] != 0, (self.evals[..., 1] -
+                                                        self.evals[..., 0]) / self.evals[..., 2], np.zeros_like(self.evals[..., 2]))
             elif metric == 'fa':
-                norm2 = t1**2 + t2**2 + t3**2
-                self.AI = np.where(norm2 != 0,
-                                   np.sqrt(((t1 - t2)**2 +
-                                            (t2 - t3)**2 +
-                                            (t1 - t3)**2) / (2 * norm2)),
-                                   np.zeros_like(t1))
+                norm2 = self.evals[..., 2]**2 + \
+                    self.evals[..., 1]**2 + self.evals[..., 0]**2
+                AI = np.where(norm2 != 0,
+                              np.sqrt(((self.evals[..., 2] - self.evals[..., 1])**2 +
+                                       (self.evals[..., 1] - self.evals[..., 0])**2 +
+                                       (self.evals[..., 2] - self.evals[..., 0])**2) / (2 * norm2)),
+                              np.zeros_like(self.evals[..., 2]))
 
-        return self.AI
+        return AI
 
     def results(self, metric='fa'):
         '''
         Quick method to return anisotropy index and orientation vectors
         '''
-        return self.get_anisotropy_index(metric=metric), self.get_orientations()
+        return self.get_anisotropy_index(metric=metric), self.orientations
 
 
 def structure_tensor_eig(image, d_sigma=7.5 / 1.2, n_sigma=6.5 / 1.2,
@@ -69,8 +61,10 @@ def structure_tensor_eig(image, d_sigma=7.5 / 1.2, n_sigma=6.5 / 1.2,
     # np.linalg.eigh requires shape = (...,3,3)
     S = np.moveaxis(S, [0, 1], [3, 4])
 
+    del Szz, Szy, Szx, Syy, Syx, Sxx
+
     evals, evectors = np.linalg.eigh(S)
-    return evals, evectors
+    return evals, evectors[..., 0]
 
 
 def structure_tensor_elements(image, d_sigma=7.5 / 1.2, n_sigma=6.5 / 1.2,
@@ -80,7 +74,8 @@ def structure_tensor_elements(image, d_sigma=7.5 / 1.2, n_sigma=6.5 / 1.2,
     """
 
     image = np.squeeze(image)
-    image = img_as_float(image)  # prevents overflow for uint8 xray data
+    # prevents overflow for uint8 xray data
+    image = img_as_float(image).astype('float32')
 
     imz, imy, imx = compute_derivatives(
         image, d_sigma=d_sigma, mode=mode, cval=cval)
