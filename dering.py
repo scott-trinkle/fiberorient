@@ -1,21 +1,33 @@
 import numpy as np
 from scipy.ndimage import median_filter, map_coordinates
+from multiprocessing import Pool
+from math import sqrt
 
 
 def get_max_radius(x0, y0, nx, ny):
     radii = []
+    rapp = radii.append
     for x in [0, nx]:
         for y in [0, ny]:
-            radii.append(np.linalg.norm([x - x0, y - y0]))
-    return np.max(radii)
+            rapp(sqrt((x - x0)**2 + (y - y0)**2))
+    return max(radii)
 
 
-def cart2pol(fxy, x0, y0):
+def cart2pol(fxy, x0=None, y0=None, nr=None, nt=None):
     ny, nx = fxy.shape
 
+    if (x0 is None) & (y0 is None):
+        x0 = nx // 2
+        y0 = ny // 2
+    if np.sum([nr is None, nt is None]) == 2:  # both are None
+        nr = nt = max(ny, nx)
+    elif np.sum([nr is None, nt is None]) == 1:  # one is None
+        if nr is None:
+            nr = nt
+        if nt is None:
+            nt = nr
+
     finalRadius = get_max_radius(x0, y0, nx, ny)
-    nr = max(nx, ny)
-    nt = max(nx, ny)
 
     R, T = np.meshgrid(np.linspace(0, finalRadius, nr, endpoint=False),
                        np.linspace(0, 2 * np.pi, nt, endpoint=False))
@@ -51,57 +63,85 @@ def pol2cart(frt, x0, y0, nx, ny):
     return fxy
 
 
+def partial_median(im, M_rad, dim, region, p13, p23):
+
+    if region == 1:
+        w = int(M_rad / 3)
+        buf = (w - 1) // 2 + 1
+
+        im1 = 0
+        im2 = p13 + buf
+        out1 = 0
+        out2 = p13
+    if region == 2:
+        w = int(2 * M_rad / 3)
+        buf = (w - 1) // 2 + 1
+
+        im1 = p13 - buf
+        im2 = p23 + buf
+        out1 = buf
+        out2 = -buf
+    if region == 3:
+        w = int(3 * M_rad / 3)
+        buf = (w - 1) // 2 + 1
+
+        im1 = p23 - buf
+        im2 = None
+        out1 = buf
+        out2 = None
+
+    size = [1, w] if dim == 'rad' else [w, 1]
+
+    return median_filter(im[:, im1:im2], size)[:, out1:out2]
+
+
 def de_ring(im, M_rad, M_azi, x0=None, y0=None, thresh_0=None,
-            nr=None, nt=None, art_thresh=None):
+            nr=None, nt=None, art_thresh=None, parallel=True):
 
     ny, nx = im.shape
 
-    if thresh_0 is None:
-        thresh_0 = [im.min(), im.max()]
+    # 13, 151
+    if thresh_0 is not None:  # only threshold if the variable is set
+        im = np.clip(im, thresh_0[0], thresh_0[1])
     if x0 is None:
         x0 = nx // 2
     if y0 is None:
         y0 = ny // 2
-    if np.sum([nr is None, nt is None]) == 2:  # both are None
-        nr = nt = max(ny, nx)
-    elif np.sum([nr is None, nt is None]) == 1:  # one is None
-        if nr is None:
-            nr = nt
-        if nt is None:
-            nt = nr
 
-    im_th = np.clip(im, thresh_0[0], thresh_0[1])
+    frt = cart2pol(im, x0=x0, y0=y0, nr=nr, nt=nt)
+    if (nr is None) & (nt is None):
+        nt, nr = frt.shape
 
-    frt = cart2pol(im_th, x0=x0, y0=y0)
+    p13 = int(nr / 3)
+    p23 = int(2 * nr / 3)
 
-    med_r = np.zeros((nr, nt), dtype=im.dtype)
-    a = np.zeros((nr, nt))
-    b = np.zeros((nr, nt))
-    c = np.zeros((nr, nt))
-    for i in range(nt):
-        a[i, :] = median_filter(frt[i, :], int(1/3 * M_rad))
-        b[i, :] = median_filter(frt[i, :], int(2/3 * M_rad))
-        c[i, :] = median_filter(frt[i, :], int(3/3 * M_rad))
-
-    p13 = int(nr/3)
-    p23 = int(2*nr/3)
-
-    med_r[:, 0:p13] = a[:, 0:p13]
-    med_r[:, p13:p23] = b[:, p13:p23]
-    med_r[:, p23:nr] = c[:, p23:nr]
+    if parallel:
+        pool = Pool(processes=3)
+        med_r = np.hstack(pool.starmap(
+            partial_median, [(frt, M_rad, 'rad', reg, p13, p23)
+                             for reg in range(1, 4)],
+            chunksize=1))
+    else:
+        med_r = np.zeros_like(frt)
+        med_r[:, 0:p13] = partial_median(frt, M_rad, 'rad', 1, p13, p23)
+        med_r[:, p13:p23] = partial_median(frt, M_rad, 'rad', 2, p13, p23)
+        med_r[:, p23:nr] = partial_median(frt, M_rad, 'rad', 3, p13, p23)
 
     art = frt - med_r
-    if art_thresh is None:
-        art_thresh = [art.min(), art.max()]
-    art = np.clip(art, art_thresh[0], art_thresh[1])
 
-    med_ra = np.zeros((nr, nt), dtype=im.dtype)
-    for i in range(p13):
-        med_ra[:, i] = median_filter(art[:, i], int(1/3 * M_azi))
-    for i in range(p13, p23):
-        med_ra[:, i] = median_filter(art[:, i], int(2/3 * M_azi))
-    for i in range(p23, nr):
-        med_ra[:, i] = median_filter(art[:, i], int(3/3 * M_azi))
+    if art_thresh is not None:  # only threshold if variable is set
+        art = np.clip(art, art_thresh[0], art_thresh[1])
+
+    if parallel:
+        med_ra = np.hstack(pool.starmap(
+            partial_median, [(art, M_azi, 'azi', reg, p13, p23)
+                             for reg in range(1, 4)],
+            chunksize=1))
+    else:
+        med_ra = np.zeros_like(art)
+        med_ra[:, 0:p13] = partial_median(art, M_azi, 'azi', 1, p13, p23)
+        med_ra[:, p13:p23] = partial_median(art, M_azi, 'azi', 2, p13, p23)
+        med_ra[:, p23:nr] = partial_median(art, M_azi, 'azi', 3, p13, p23)
 
     med_ra = pol2cart(med_ra, x0=x0, y0=y0, nx=nx, ny=ny)
 
