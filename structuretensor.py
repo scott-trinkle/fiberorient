@@ -1,16 +1,19 @@
 import numpy as np
 from scipy.ndimage import gaussian_filter
 from skimage import img_as_float
+from concurrent.futures import ProcessPoolExecutor
 
 
 class StructureTensor(object):
-    def __init__(self, im, d_sigma=15.0 / 2.4, n_sigma=13 / 2.4,
-                 gaussmode='nearest', cval=0):
+    def __init__(self, im, d_sigma=15.0 / 1.2, n_sigma=13 / 1.2,
+                 gaussmode='nearest', cval=0, parallel=True, n=None):
         self.evals, self.orientations = structure_tensor_eig(image=im,
                                                              d_sigma=d_sigma,
                                                              n_sigma=n_sigma,
                                                              mode=gaussmode,
-                                                             cval=cval)
+                                                             cval=cval,
+                                                             parallel=parallel,
+                                                             n=n)
 
     def get_anisotropy_index(self, metric='fa'):
         '''
@@ -44,8 +47,8 @@ class StructureTensor(object):
         return self.get_anisotropy_index(metric=metric), self.orientations
 
 
-def structure_tensor_eig(image, d_sigma=7.5 / 1.2, n_sigma=6.5 / 1.2,
-                         mode='nearest', cval=0):
+def structure_tensor_eig(image, d_sigma=15 / 1.2, n_sigma=13 / 1.2,
+                         mode='nearest', cval=0, parallel=True, n=None):
     '''
     Returns the eigenvalues and eigenvectors of the structure tensor
     for an image.
@@ -63,11 +66,20 @@ def structure_tensor_eig(image, d_sigma=7.5 / 1.2, n_sigma=6.5 / 1.2,
 
     del Szz, Szy, Szx, Syy, Syx, Sxx
 
-    evals, evectors = np.linalg.eigh(S)
-    return evals, evectors[..., 0]
+    if parallel:
+        evals = np.zeros(S.shape[:4])
+        evectors = np.zeros(S.shape)
+
+        with ProcessPoolExecutor(n) as pool:
+            evals, evectors = zip(
+                *[eig for eig in pool.map(np.linalg.eigh, S)])
+            return np.array(evals), np.array(evectors)[..., 0]
+    else:
+        evals, evectors = np.linalg.eigh(S)
+        return evals, evectors[..., 0]
 
 
-def structure_tensor_elements(image, d_sigma=7.5 / 1.2, n_sigma=6.5 / 1.2,
+def structure_tensor_elements(image, d_sigma=15 / 1.2, n_sigma=13 / 1.2,
                               mode='nearest', cval=0):
     """
     Computes the structure tensor elements
@@ -91,7 +103,7 @@ def structure_tensor_elements(image, d_sigma=7.5 / 1.2, n_sigma=6.5 / 1.2,
     return Szz, Szy, Szx, Syy, Syx, Sxx
 
 
-def compute_derivatives(image, d_sigma=7.5 / 1.2, mode='nearest', cval=0):
+def compute_derivatives(image, d_sigma=15 / 1.2, mode='nearest', cval=0):
     """
     Compute derivatives in row, column and plane directions using convolution
     with Gaussian partial derivatives
