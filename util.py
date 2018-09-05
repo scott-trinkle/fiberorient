@@ -92,3 +92,22 @@ def colormap(x, y, z):
     s = np.arange(x.flatten().size).reshape(x.shape)
 
     return colors, s
+
+
+def k_means(im, sig=2.7):
+    from sklearn import cluster
+    from scipy.ndimage import gaussian_filter, binary_dilation
+
+    im = gaussian_filter(im, sig)
+    kmeans = cluster.MiniBatchKMeans(n_clusters=3,
+                                     n_init=3,
+                                     batch_size=100,
+                                     random_state=48).fit(im.reshape((-1, 1)))
+
+    labels = kmeans.labels_.reshape(im.shape)
+    # mask = np.zeros_like(labels)
+    # mask[labels == 1] = 1
+    # mask = binary_dilation(mask, iterations=1).astype(mask.dtype)
+    # return mask
+
+    return labels
