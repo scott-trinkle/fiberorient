@@ -112,10 +112,10 @@ def compute_derivatives(image, d_sigma=15 / 1.2, mode='nearest', cval=0):
     """
 
     imz = gaussian_filter(
-        image, [d_sigma, 0, 0], order=[1, 0, 0], mode=mode, cval=cval)
+        image, d_sigma, order=[1, 0, 0], mode=mode, cval=cval)
     imy = gaussian_filter(
-        image, [0, d_sigma, 0], order=[0, 1, 0], mode=mode, cval=cval)
+        image, d_sigma, order=[0, 1, 0], mode=mode, cval=cval)
     imx = gaussian_filter(
-        image, [0, 0, d_sigma], order=[0, 0, 1], mode=mode, cval=cval)
+        image, d_sigma, order=[0, 0, 1], mode=mode, cval=cval)
 
     return imz, imy, imx
