@@ -1,6 +1,7 @@
 import math
 import numpy as np
 from scipy.special import sph_harm
+from sklearn.neighbors import NearestNeighbors
 from dipy.core.sphere import Sphere
 from dipy.direction.peaks import peak_directions
 from .util import split_comps
@@ -53,6 +54,11 @@ def check_degree(degree):
         raise ValueError('SH Degree must be even')
 
 
+def check_vectors(vectors):
+    if (vectors.ndim != 2) | (vectors.shape[-1] != 3):
+        raise ValueError('Vector shape must be (K,3)')
+
+
 def get_SH_loop_ind(degree):
     '''
     Get indices for looping the even-n, positive-m SHs
@@ -80,7 +86,53 @@ def real_sph_harm(m, n, theta, phi):
         return sh.real
 
 
-def get_SH_coeffs(degree, theta, phi):
+def make_hist(vectors, sphere):
+
+    hist_points = np.stack((sphere.z, sphere.y, sphere.x), axis=-1)
+    nbrs = NearestNeighbors(n_neighbors=1,
+                            algorithm='ball_tree').fit(hist_points)
+    indices = nbrs.kneighbors(vectors, return_distance=False)
+    hist, _ = np.histogram(indices, bins=range(sphere.theta.size + 1))
+    return hist
+
+
+def get_SH_coeffs(degree, vectors, sphere):
+    '''
+    Calculate even-degree SH coefficients up to 'degree'
+    Order of output is given by:
+
+    (m, n)
+    ______
+    (0, 0)
+    (0, 2)
+    (-1, 2)
+    (1, 2)
+    (-2, 2)
+    (2, 2)
+    (0, 3)
+      .
+      .
+      .
+    '''
+
+    check_degree(degree)
+    check_vectors(vectors)
+    hist = make_hist(vectors, sphere)
+    mn = get_SH_loop_ind(degree)
+    c = []
+    app = c.append
+    K = vectors.shape[0]
+    for m, n in mn:
+        if m == 0:
+            app((hist * real_sph_harm(m, n, sphere.theta, sphere.phi)).sum() / K)
+        else:
+            neg, pos = real_sph_harm(m, n, sphere.theta, sphere.phi)
+            app(math.sqrt(2) * (hist * neg).sum() / K)
+            app(math.sqrt(2) * (hist * pos).sum() / K)
+    return c
+
+
+def get_SH_coeffs_delta(degree, theta, phi):
     '''
     Calculate even-degree SH coefficients up to 'degree'
     Order of output is given by:
