@@ -56,7 +56,9 @@ def check_degree(degree):
 
 def check_vectors(vectors):
     if (vectors.ndim != 2) | (vectors.shape[-1] != 3):
-        raise ValueError('Vector shape must be (K,3)')
+        return vectors.reshape((-1, 3))
+    else:
+        return vectors
 
 
 def get_SH_loop_ind(degree):
@@ -116,7 +118,7 @@ def get_SH_coeffs(degree, vectors, sphere):
     '''
 
     check_degree(degree)
-    check_vectors(vectors)
+    vectors = check_vectors(vectors)
     hist = make_hist(vectors, sphere)
     mn = get_SH_loop_ind(degree)
     c = []
