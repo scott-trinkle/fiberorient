@@ -4,7 +4,9 @@ from scipy.special import sph_harm
 from sklearn.neighbors import NearestNeighbors
 from dipy.core.sphere import Sphere
 from dipy.direction.peaks import peak_directions
-from .util import split_comps
+# from .util import split_comps
+import pkg_resources
+data_path = pkg_resources.resource_filename('strtens', 'data/')
 
 
 def make_sphere(n):
@@ -88,17 +90,38 @@ def real_sph_harm(m, n, theta, phi):
         return sh.real
 
 
+def _precompute_SH(N=6500, degree=20):
+    check_degree(degree)
+    sphere = make_sphere(N)
+    mn = get_SH_loop_ind(degree)
+    num_coeffs = int(((degree * 2 + 3)**2 - 1) / 8)
+    sh = np.zeros((num_coeffs, N))
+    count = 0
+    for m, n in mn:
+        if m == 0:
+            sh[count] = real_sph_harm(m, n, sphere.theta, sphere.phi)
+            count += 1
+        else:
+            neg, pos = real_sph_harm(m, n, sphere.theta, sphere.phi)
+            sh[count] = math.sqrt(2) * neg
+            count += 1
+            sh[count] = math.sqrt(2) * pos
+            count += 1
+    np.save(data_path + 'sh_deg{}_n{}'.format(degree, N), sh)
+
+
 def make_hist(vectors, sphere):
 
     hist_points = np.stack((sphere.z, sphere.y, sphere.x), axis=-1)
     nbrs = NearestNeighbors(n_neighbors=1,
-                            algorithm='ball_tree').fit(hist_points)
+                            algorithm='ball_tree',
+                            leaf_size=5).fit(hist_points)
     indices = nbrs.kneighbors(vectors, return_distance=False)
     hist, _ = np.histogram(indices, bins=range(sphere.theta.size + 1))
     return hist
 
 
-def get_SH_coeffs(degree, vectors, sphere):
+def get_SH_coeffs(vectors, pre=True, n_bins=6500, degree=20):
     '''
     Calculate even-degree SH coefficients up to 'degree'
     Order of output is given by:
@@ -117,20 +140,26 @@ def get_SH_coeffs(degree, vectors, sphere):
       .
     '''
 
-    check_degree(degree)
     vectors = check_vectors(vectors)
+    sphere = make_sphere(n_bins)
     hist = make_hist(vectors, sphere)
-    mn = get_SH_loop_ind(degree)
-    c = []
-    app = c.append
     K = vectors.shape[0]
-    for m, n in mn:
-        if m == 0:
-            app((hist * real_sph_harm(m, n, sphere.theta, sphere.phi)).sum() / K)
-        else:
-            neg, pos = real_sph_harm(m, n, sphere.theta, sphere.phi)
-            app(math.sqrt(2) * (hist * neg).sum() / K)
-            app(math.sqrt(2) * (hist * pos).sum() / K)
+    if pre:
+        sh = np.load(data_path + 'sh_deg20_n6500.npy')
+        c = (sh * hist[None, :]).sum(axis=1) / K
+    else:
+        check_degree(degree)
+        mn = get_SH_loop_ind(degree)
+        c = []
+        app = c.append
+
+        for m, n in mn:
+            if m == 0:
+                app((hist * real_sph_harm(m, n, sphere.theta, sphere.phi)).sum() / K)
+            else:
+                neg, pos = real_sph_harm(m, n, sphere.theta, sphere.phi)
+                app(math.sqrt(2) * (hist * neg).sum() / K)
+                app(math.sqrt(2) * (hist * pos).sum() / K)
     return c
 
 
