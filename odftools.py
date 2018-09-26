@@ -4,7 +4,7 @@ from scipy.special import sph_harm
 from sklearn.neighbors import NearestNeighbors
 from dipy.core.sphere import Sphere
 from dipy.direction.peaks import peak_directions
-# from .util import split_comps
+from .util import split_comps
 import pkg_resources
 data_path = pkg_resources.resource_filename('strtens', 'data/')
 
@@ -117,7 +117,7 @@ def make_hist(vectors, sphere):
                             algorithm='ball_tree',
                             leaf_size=5).fit(hist_points)
     indices = nbrs.kneighbors(vectors, return_distance=False)
-    hist, _ = np.histogram(indices, bins=range(sphere.theta.size + 1))
+    hist = np.bincount(indices.flatten(), minlength=sphere.theta.size)
     return hist
 
 
