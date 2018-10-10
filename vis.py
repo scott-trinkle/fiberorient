@@ -57,6 +57,8 @@ def show_ODF(odf, sphere, ren=None, interactive=True, save=False, fn=None, ax_sc
         window.show(ren)
     if save:
         window.record(ren, out_path=fn, size=(1200, 1200))
+        window.clear(ren)
+
     return ren
 
 
