@@ -10,7 +10,10 @@ except:
 
 class StructureTensor(object):
     def __init__(self, im, d_sigma=15.0 / 1.2, n_sigma=13 / 1.2,
-                 gaussmode='nearest', cval=0, cuda=False, par_cpu=True, n=None):
+                 gaussmode='nearest', cval=0, cuda=False, par_cpu=True, n=None,
+                 verbose=False):
+        if verbose:
+            self.verbose = True
 
         self.evals, self.orientations = structure_tensor_eig(image=im,
                                                              d_sigma=d_sigma,
@@ -19,7 +22,8 @@ class StructureTensor(object):
                                                              cval=cval,
                                                              cuda=cuda,
                                                              par_cpu=par_cpu,
-                                                             n=n)
+                                                             n=n,
+                                                             verbose=verbose)
 
     def get_anisotropy_index(self, metric='fa'):
         '''
@@ -50,19 +54,24 @@ class StructureTensor(object):
         '''
         Quick method to return anisotropy index and orientation vectors
         '''
+        if self.verbose:
+            print('Calculating FA')
         return self.get_anisotropy_index(metric=metric), self.orientations
 
 
 def structure_tensor_eig(image, d_sigma=15 / 1.2, n_sigma=13 / 1.2,
                          mode='nearest', cval=0, cuda=False, par_cpu=False,
-                         n=None):
+                         n=None, verbose=False):
     '''
     Returns the eigenvalues and eigenvectors of the structure tensor
     for an image.
     '''
 
+    if verbose:
+        print('Calculating ST elements')
     Szz, Szy, Szx, Syy, Syx, Sxx = structure_tensor_elements(
-        image, d_sigma=d_sigma, n_sigma=n_sigma, mode=mode, cval=cval)
+        image, d_sigma=d_sigma, n_sigma=n_sigma, mode=mode, cval=cval,
+        verbose=verbose)
 
     if cuda:
         # Copying ST elements to GPU
@@ -102,6 +111,8 @@ def structure_tensor_eig(image, d_sigma=15 / 1.2, n_sigma=13 / 1.2,
 
         del Szz, Szy, Szx, Syy, Syx, Sxx
 
+        if verbose:
+            print('Calculating eigenvectors/values')
         if par_cpu:
             from concurrent.futures import ProcessPoolExecutor
             evals = np.zeros(S.shape[:4])
@@ -117,7 +128,7 @@ def structure_tensor_eig(image, d_sigma=15 / 1.2, n_sigma=13 / 1.2,
 
 
 def structure_tensor_elements(image, d_sigma=15 / 1.2, n_sigma=13 / 1.2,
-                              mode='nearest', cval=0):
+                              mode='nearest', cval=0, verbose=False):
     """
     Computes the structure tensor elements
     """
@@ -126,30 +137,53 @@ def structure_tensor_elements(image, d_sigma=15 / 1.2, n_sigma=13 / 1.2,
     # prevents overflow for uint8 xray data
     image = img_as_float(image).astype('float32')
 
+    if verbose:
+        print('Computing gradient')
     imz, imy, imx = compute_derivatives(
-        image, d_sigma=d_sigma, mode=mode, cval=cval)
+        image, d_sigma=d_sigma, mode=mode, cval=cval, verbose=verbose)
 
+    if verbose:
+        print('Forming ST elements:')
     # structure tensor
+    if verbose:
+        print('Szz')
     Szz = gaussian_filter(imz * imz, n_sigma, mode=mode, cval=cval)
+    if verbose:
+        print('Szy')
     Szy = gaussian_filter(imz * imy, n_sigma, mode=mode, cval=cval)
+    if verbose:
+        print('Szx')
     Szx = gaussian_filter(imz * imx, n_sigma, mode=mode, cval=cval)
+    if verbose:
+        print('Syy')
     Syy = gaussian_filter(imy * imy, n_sigma, mode=mode, cval=cval)
+    if verbose:
+        print('Syx')
     Syx = gaussian_filter(imy * imx, n_sigma, mode=mode, cval=cval)
+    if verbose:
+        print('Sxx')
     Sxx = gaussian_filter(imx * imx, n_sigma, mode=mode, cval=cval)
 
     return Szz, Szy, Szx, Syy, Syx, Sxx
 
 
-def compute_derivatives(image, d_sigma=15 / 1.2, mode='nearest', cval=0):
+def compute_derivatives(image, d_sigma=15 / 1.2, mode='nearest', cval=0,
+                        verbose=False):
     """
     Compute derivatives in row, column and plane directions using convolution
     with Gaussian partial derivatives
     """
 
+    if verbose:
+        print('Imz')
     imz = gaussian_filter(
         image, d_sigma, order=[1, 0, 0], mode=mode, cval=cval)
+    if verbose:
+        print('Imy')
     imy = gaussian_filter(
         image, d_sigma, order=[0, 1, 0], mode=mode, cval=cval)
+    if verbose:
+        print('Imx')
     imx = gaussian_filter(
         image, d_sigma, order=[0, 0, 1], mode=mode, cval=cval)
 
