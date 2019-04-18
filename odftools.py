@@ -121,7 +121,7 @@ def make_hist(vectors, sphere):
     return hist
 
 
-def get_SH_coeffs(vectors, pre=True, n_bins=6500, degree=20):
+def get_SH_coeffs(vectors, K, pre=True, n_bins=6500, degree=20):
     '''
     Calculate even-degree SH coefficients up to 'degree'
     Order of output is given by:
@@ -143,7 +143,6 @@ def get_SH_coeffs(vectors, pre=True, n_bins=6500, degree=20):
     vectors = check_vectors(vectors)
     sphere = make_sphere(n_bins)
     hist = make_hist(vectors, sphere)
-    K = vectors.shape[0]
     if pre:
         sh = np.load(data_path + 'sh_deg20_n6500.npy')
         c = (sh * hist[None, :]).sum(axis=1) / K

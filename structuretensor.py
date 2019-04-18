@@ -9,11 +9,13 @@ except:
 
 
 class StructureTensor(object):
-    def __init__(self, im, d_sigma=15.0 / 1.2, n_sigma=13 / 1.2,
+    def __init__(self, im, d_sigma=7.5 / 1.2, n_sigma=6.5 / 1.2,
                  gaussmode='nearest', cval=0, cuda=False, par_cpu=True, n=None,
                  verbose=False):
         if verbose:
             self.verbose = True
+        else:
+            self.verbose = False
 
         self.evals, self.orientations = structure_tensor_eig(image=im,
                                                              d_sigma=d_sigma,
