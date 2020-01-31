@@ -17,23 +17,23 @@ def make_sphere(n):
     '''
 
     z = np.linspace(1 - 1 / n, -1 + 1 / n, num=n)
-    theta = np.arccos(z)
-    phi = np.mod((np.pi * (3.0 - np.sqrt(5.0))) *
-                 np.arange(n), 2 * np.pi) - np.pi
-    phi[phi < 0] += 2 * np.pi  # sph_harm functions require phi in [0, 2pi]
+    polar = np.arccos(z)
+    azim = np.mod((np.pi * (3.0 - np.sqrt(5.0))) *
+                  np.arange(n), 2 * np.pi) - np.pi
+    azim[azim < 0] += 2 * np.pi  # sph_harm functions require azim in [0, 2pi]
 
-    sphere = Sphere(theta=theta, phi=phi)
+    sphere = Sphere(theta=polar, phi=azim)
     return sphere
 
 
 def cart_to_spherical(vectors, FA=None, FA_threshold=0.69, im=None, im_threshold=83):
     '''
     Takes [...,3] ndarray of vectors and returns flat lists of
-    theta and phi values in spherical coordinates.
+    polar and azim values in spherical coordinates.
 
     Note:
-    theta is in [0, pi]
-    phi is in [0, 2pi]
+    polar is in [0, pi]
+    azim is in [0, 2pi]
     '''
 
     # Always threshold by FA, NOT always threshold by im
@@ -42,16 +42,16 @@ def cart_to_spherical(vectors, FA=None, FA_threshold=0.69, im=None, im_threshold
     elif FA is not None and im is not None:
         vectors = vectors[(FA > FA_threshold) & (im > im_threshold)]
 
-    vz, vy, vx = split_comps(vectors)
-    r = np.sqrt(vz**2 + vy**2 + vx**2)
-    theta = np.arccos(vz / r)
-    phi = np.arctan2(vy, vx)
-    phi[phi < 0] += 2 * np.pi  # sph_harm functions require phi in [0,2pi]
+    v0, v1, v2 = split_comps(vectors)
+    r = np.sqrt(v0**2 + v1**2 + v2**2)
+    polar = np.arccos(v2 / r)  # z / r
+    azim = np.arctan2(v1, v0)  # y / x
+    azim[azim < 0] += 2 * np.pi  # sph_harm functions require azim in [0,2pi]
 
-    return theta, phi
+    return polar, azim
 
 
-def check_degree(degree):
+def check_even(degree):
     if degree % 2 != 0:
         raise ValueError('SH Degree must be even')
 
@@ -63,22 +63,25 @@ def check_vectors(vectors):
         return vectors
 
 
-def get_SH_loop_ind(degree):
+def get_SH_loop_ind(degree, even=True):
     '''
     Get indices for looping the even-n, positive-m SHs
     '''
-    check_degree(degree)
-    mn = [(m, n) for n in range(0, degree + 1, 2)
-          for m in range(0, n + 1)]
+    if even:
+        check_even(degree)
+        mn = [(m, n) for n in range(0, degree + 1, 2)
+              for m in range(0, n + 1)]
+    else:
+        mn = [(m, n) for n in range(0, degree + 1, 1) for m in range(0, n + 1)]
     return mn
 
 
-def real_sph_harm(m, n, theta, phi):
+def real_sph_harm(m, n, polar, azim):
     '''
     Assumes m is positive, calculates sph_harm for +m and -m using
     conjugate symmetry
     '''
-    sh = sph_harm(m, n, phi, theta)
+    sh = sph_harm(m, n, azim, polar)
     if m != 0:
         # Implements conjugate symmetry as in Dipy.
         # Note: it is faster to include sqrt(2) factor when
@@ -91,7 +94,6 @@ def real_sph_harm(m, n, theta, phi):
 
 
 def _precompute_SH(N=6500, degree=20):
-    check_degree(degree)
     sphere = make_sphere(N)
     mn = get_SH_loop_ind(degree)
     num_coeffs = int(((degree * 2 + 3)**2 - 1) / 8)
@@ -112,7 +114,7 @@ def _precompute_SH(N=6500, degree=20):
 
 def make_hist(vectors, sphere):
 
-    hist_points = np.stack((sphere.z, sphere.y, sphere.x), axis=-1)
+    hist_points = np.stack((sphere.x, sphere.y, sphere.z), axis=-1)
     nbrs = NearestNeighbors(n_neighbors=1,
                             algorithm='ball_tree',
                             leaf_size=5).fit(hist_points)
@@ -147,7 +149,6 @@ def get_SH_coeffs(vectors, K, pre=True, n_bins=6500, degree=20):
         sh = np.load(data_path + 'sh_deg20_n6500.npy')
         c = (sh * hist[None, :]).sum(axis=1) / K
     else:
-        check_degree(degree)
         mn = get_SH_loop_ind(degree)
         c = []
         app = c.append
@@ -162,7 +163,7 @@ def get_SH_coeffs(vectors, K, pre=True, n_bins=6500, degree=20):
     return c
 
 
-def get_SH_coeffs_delta(degree, theta, phi):
+def get_SH_coeffs_delta(vectors, K, even=True, degree=20):
     '''
     Calculate even-degree SH coefficients up to 'degree'
     Order of output is given by:
@@ -180,29 +181,28 @@ def get_SH_coeffs_delta(degree, theta, phi):
       .
       .
     '''
-    check_degree(degree)
-    mn = get_SH_loop_ind(degree)
+    polar, azim = cart_to_spherical(vectors)
+    mn = get_SH_loop_ind(degree, even)
     c = []
     app = c.append
-    K = theta.size
+    K = polar.size
     for m, n in mn:
         if m == 0:
-            app(real_sph_harm(m, n, theta, phi).sum() / K)
+            app(real_sph_harm(m, n, polar, azim).sum() / K)
         else:
-            neg, pos = real_sph_harm(m, n, theta, phi)
+            neg, pos = real_sph_harm(m, n, polar, azim)
             app(math.sqrt(2) * neg.sum() / K)
             app(math.sqrt(2) * pos.sum() / K)
 
     return c
 
 
-def get_odf(coeffs, sphere):
+def get_odf(coeffs, sphere, degree, even=True):
     '''
     Calculates odf as linear combination of real SH using coeffs,
     evaluated on sample points defined by sphere.
     '''
-    degree = int((math.sqrt(8 * len(coeffs) + 1) - 3) // 2)
-    mn = get_SH_loop_ind(degree)
+    mn = get_SH_loop_ind(degree, even)
     odf = np.zeros(sphere.phi.size)
     i = 0
     for m, n in mn:
@@ -274,3 +274,29 @@ def calc_JSD(c1, c2, sphere):
     D_QM = (Q * np.log(Q / M)).sum()
     JSD = (D_PM + D_QM) / 2
     return JSD
+
+
+def APS(c):
+    num_coeffs = c.shape[-1]
+    degree = int((np.sqrt(8 * num_coeffs + 1) - 3) // 2)
+
+    even_mns = get_SH_loop_ind(20)
+    l_inds = []
+    for mn in even_mns:
+        m, l = mn
+        if l == 0:
+            l_inds.append(l)
+        elif m == 0:
+            l_inds.append(l)
+        if m != 0:
+            l_inds.append(l)
+            l_inds.append(l)
+
+    l_inds = np.array(l_inds)
+    l_labs = np.unique(l_inds)
+
+    aps = []
+    for l in l_labs:
+        aps.append((c[l_inds == l]**2).sum())
+
+    return np.array(aps)
