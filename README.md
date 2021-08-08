@@ -13,7 +13,7 @@ brain](https://doi.org/https://doi.org/10.1002/mrm.28776),” Magnetic Resonance
 in Medicine, vol. 86, no. 2, pp. 1067–1076, 2021.
 
 For more information, see [my blog
-post](https://www.scotttrinkle.com/news/microct-paper/)
+post](https://www.scotttrinkle.com/news/microct-paper/).
 
 ## Installation
 
