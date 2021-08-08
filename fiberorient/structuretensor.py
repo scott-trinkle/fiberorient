@@ -1,17 +1,12 @@
 import numpy as np
 from scipy.ndimage import gaussian_filter
 from skimage import img_as_float
-try:
-    import cupy as cp
-    from .cuda_kernels import cu_eigh
-except:
-    pass
+from concurrent.futures import ProcessPoolExecutor
 
 
 class StructureTensor(object):
     def __init__(self, im, d_sigma=7.5 / 1.2, n_sigma=6.5 / 1.2,
-                 gaussmode='nearest', cval=0, cuda=False, par_cpu=True, n=None,
-                 verbose=False):
+                 gaussmode='nearest', cval=0, n=None, verbose=False):
         if verbose:
             self.verbose = True
         else:
@@ -22,8 +17,6 @@ class StructureTensor(object):
                                                              n_sigma=n_sigma,
                                                              mode=gaussmode,
                                                              cval=cval,
-                                                             cuda=cuda,
-                                                             par_cpu=par_cpu,
                                                              n=n,
                                                              verbose=verbose)
 
@@ -62,8 +55,7 @@ class StructureTensor(object):
 
 
 def structure_tensor_eig(image, d_sigma=15 / 1.2, n_sigma=13 / 1.2,
-                         mode='nearest', cval=0, cuda=False, par_cpu=False,
-                         n=None, verbose=False):
+                         mode='nearest', cval=0, n=None, verbose=False):
     '''
     Returns the eigenvalues and eigenvectors of the structure tensor
     for an image.
@@ -75,58 +67,23 @@ def structure_tensor_eig(image, d_sigma=15 / 1.2, n_sigma=13 / 1.2,
         image, d_sigma=d_sigma, n_sigma=n_sigma, mode=mode, cval=cval,
         verbose=verbose)
 
-    if cuda:
-        # Copying ST elements to GPU
-        a = cp.array(Szz)
-        b = cp.array(Szy)
-        c = cp.array(Szx)
-        d = cp.array(Syy)
-        e = cp.array(Syx)
-        f = cp.array(Sxx)
+    S = np.array([[Szz, Szy, Szx],
+                  [Szy, Syy, Syx],
+                  [Szx, Syx, Sxx]])
 
-        # Initialize individual eig elements
-        eig1 = cp.zeros_like(Sxx)
-        eig2 = cp.zeros_like(Sxx)
-        eig3 = cp.zeros_like(Sxx)
+    # np.linalg.eigh requires shape = (...,3,3)
+    S = np.moveaxis(S, [0, 1], [3, 4])
 
-        # Kernel only calculates smallest eigenvector
-        vec1 = cp.zeros_like(Sxx)
-        vec2 = cp.zeros_like(Sxx)
-        vec3 = cp.zeros_like(Sxx)
+    if verbose:
+        print('Calculating eigenvectors/values')
 
-        cu_eigh(a, b, c, d, e, f, eig1, eig2, eig3, vec1, vec2, vec3)
+    evals = np.zeros(S.shape[:4])
+    evectors = np.zeros(S.shape)
 
-        evals = np.stack((eig3.get(), eig2.get(), eig1.get()),
-                         axis=-1)
-        evecs = np.stack((vec1.get(), vec2.get(), vec3.get()),
-                         axis=-1)
-
-        return evals, evecs
-    else:
-
-        S = np.array([[Szz, Szy, Szx],
-                      [Szy, Syy, Syx],
-                      [Szx, Syx, Sxx]])
-
-        # np.linalg.eigh requires shape = (...,3,3)
-        S = np.moveaxis(S, [0, 1], [3, 4])
-
-        del Szz, Szy, Szx, Syy, Syx, Sxx
-
-        if verbose:
-            print('Calculating eigenvectors/values')
-        if par_cpu:
-            from concurrent.futures import ProcessPoolExecutor
-            evals = np.zeros(S.shape[:4])
-            evectors = np.zeros(S.shape)
-
-            with ProcessPoolExecutor(n) as pool:
-                evals, evectors = zip(
-                    *[eig for eig in pool.map(np.linalg.eigh, S)])
-                return np.array(evals), np.array(evectors)[..., 0]
-        else:
-            evals, evectors = np.linalg.eigh(S)
-            return evals, evectors[..., 0]
+    with ProcessPoolExecutor(n) as pool:
+        evals, evectors = zip(
+            *[eig for eig in pool.map(np.linalg.eigh, S)])
+    return np.array(evals), np.array(evectors)[..., 0]
 
 
 def structure_tensor_elements(image, d_sigma=15 / 1.2, n_sigma=13 / 1.2,

@@ -274,29 +274,3 @@ def calc_JSD(c1, c2, sphere):
     D_QM = (Q * np.log(Q / M)).sum()
     JSD = (D_PM + D_QM) / 2
     return JSD
-
-
-def APS(c):
-    num_coeffs = c.shape[-1]
-    degree = int((np.sqrt(8 * num_coeffs + 1) - 3) // 2)
-
-    even_mns = get_SH_loop_ind(20)
-    l_inds = []
-    for mn in even_mns:
-        m, l = mn
-        if l == 0:
-            l_inds.append(l)
-        elif m == 0:
-            l_inds.append(l)
-        if m != 0:
-            l_inds.append(l)
-            l_inds.append(l)
-
-    l_inds = np.array(l_inds)
-    l_labs = np.unique(l_inds)
-
-    aps = []
-    for l in l_labs:
-        aps.append((c[l_inds == l]**2).sum())
-
-    return np.array(aps)
