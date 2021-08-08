@@ -1,16 +1,19 @@
+import logging
+
 import numpy as np
 from scipy.ndimage import gaussian_filter
 from skimage import img_as_float
 from concurrent.futures import ProcessPoolExecutor
 
+img = np.random.random((25, 25, 25))
+
 
 class StructureTensor(object):
+
     def __init__(self, im, d_sigma=7.5 / 1.2, n_sigma=6.5 / 1.2,
                  gaussmode='nearest', cval=0, n=None, verbose=False):
         if verbose:
-            self.verbose = True
-        else:
-            self.verbose = False
+            logging.basicConfig(level=logging.INFO, format='%(message)s')
 
         self.evals, self.orientations = structure_tensor_eig(image=im,
                                                              d_sigma=d_sigma,
@@ -50,7 +53,7 @@ class StructureTensor(object):
         Quick method to return anisotropy index and orientation vectors
         '''
         if self.verbose:
-            print('Calculating FA')
+            logging.info('Calculating FA')
         return self.get_anisotropy_index(metric=metric), self.orientations
 
 
@@ -62,7 +65,7 @@ def structure_tensor_eig(image, d_sigma=15 / 1.2, n_sigma=13 / 1.2,
     '''
 
     if verbose:
-        print('Calculating ST elements')
+        logging.info('Calculating ST elements')
     Szz, Szy, Szx, Syy, Syx, Sxx = structure_tensor_elements(
         image, d_sigma=d_sigma, n_sigma=n_sigma, mode=mode, cval=cval,
         verbose=verbose)
@@ -75,7 +78,7 @@ def structure_tensor_eig(image, d_sigma=15 / 1.2, n_sigma=13 / 1.2,
     S = np.moveaxis(S, [0, 1], [3, 4])
 
     if verbose:
-        print('Calculating eigenvectors/values')
+        logging.info('Calculating eigenvectors/values')
 
     evals = np.zeros(S.shape[:4])
     evectors = np.zeros(S.shape)
@@ -97,30 +100,30 @@ def structure_tensor_elements(image, d_sigma=15 / 1.2, n_sigma=13 / 1.2,
     image = img_as_float(image).astype('float32')
 
     if verbose:
-        print('Computing gradient')
+        logging.info('Computing gradient')
     imz, imy, imx = compute_derivatives(
         image, d_sigma=d_sigma, mode=mode, cval=cval, verbose=verbose)
 
     if verbose:
-        print('Forming ST elements:')
+        logging.info('Forming ST elements:')
     # structure tensor
     if verbose:
-        print('Szz')
+        logging.info('Szz')
     Szz = gaussian_filter(imz * imz, n_sigma, mode=mode, cval=cval)
     if verbose:
-        print('Szy')
+        logging.info('Szy')
     Szy = gaussian_filter(imz * imy, n_sigma, mode=mode, cval=cval)
     if verbose:
-        print('Szx')
+        logging.info('Szx')
     Szx = gaussian_filter(imz * imx, n_sigma, mode=mode, cval=cval)
     if verbose:
-        print('Syy')
+        logging.info('Syy')
     Syy = gaussian_filter(imy * imy, n_sigma, mode=mode, cval=cval)
     if verbose:
-        print('Syx')
+        logging.info('Syx')
     Syx = gaussian_filter(imy * imx, n_sigma, mode=mode, cval=cval)
     if verbose:
-        print('Sxx')
+        logging.info('Sxx')
     Sxx = gaussian_filter(imx * imx, n_sigma, mode=mode, cval=cval)
 
     return Szz, Szy, Szx, Syy, Syx, Sxx
@@ -134,15 +137,15 @@ def compute_derivatives(image, d_sigma=15 / 1.2, mode='nearest', cval=0,
     """
 
     if verbose:
-        print('Imz')
+        logging.info('Imz')
     imz = gaussian_filter(
         image, d_sigma, order=[1, 0, 0], mode=mode, cval=cval)
     if verbose:
-        print('Imy')
+        logging.info('Imy')
     imy = gaussian_filter(
         image, d_sigma, order=[0, 1, 0], mode=mode, cval=cval)
     if verbose:
-        print('Imx')
+        logging.info('Imx')
     imx = gaussian_filter(
         image, d_sigma, order=[0, 0, 1], mode=mode, cval=cval)
 
