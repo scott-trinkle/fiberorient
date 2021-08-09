@@ -8,7 +8,7 @@ calculating orientation distribution functions from 3D imaging data.
 Code, data, and examples stem from work published as: 
 
 Trinkle, S., Foxley, S., Kasthuri, N., La Rivière, P., “[Synchrotron x-ray
-micro-ct as a validation dataset for diffusion mri in whole mouse
+micro-CT as a validation dataset for diffusion mri in whole mouse
 brain](https://doi.org/https://doi.org/10.1002/mrm.28776),” Magnetic Resonance
 in Medicine, vol. 86, no. 2, pp. 1067–1076, 2021.
 

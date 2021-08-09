@@ -2,151 +2,164 @@ import logging
 
 import numpy as np
 from scipy.ndimage import gaussian_filter
-from skimage import img_as_float
 from concurrent.futures import ProcessPoolExecutor
-
-img = np.random.random((25, 25, 25))
+from .util import get_westin, get_fa
 
 
 class StructureTensor(object):
+    """Class for calculating the 3D structure tensor at every voxel of an
+    image. Contains methods for performing eigenanalysis on the resulting
+    tensors, which can be used to estimate the orientation of local fiber-like
+    structures.
 
-    def __init__(self, im, d_sigma=7.5 / 1.2, n_sigma=6.5 / 1.2,
-                 gaussmode='nearest', cval=0, n=None, verbose=False):
+    Parameters
+    __________
+    d_sigma : float
+        Sigma for the gaussian derivative filters
+    n_sigma : float
+        Sigma for the gaussian neighborhood filters
+    gaussargs : dict
+        Keyword arguments for scipy.ndimage.gaussian_filter. Defaults to
+        {'mode' : nearest', 'cval' : 0}
+    n_jobs : int
+        Number of CPU processes for eigenanalysis. Defaults to None, which
+        uses all available cores.
+    verbose : bool
+        Verbosity mode. Default is False
+
+    """
+
+    def __init__(self, d_sigma, n_sigma,
+                 gaussargs=None, n_jobs=None, verbose=False):
+
+        self.d_sigma = d_sigma
+        self.n_sigma = n_sigma
+        if gaussargs is None:
+            self.gaussargs = {'mode': 'nearest', 'cval': 0}
+        self.n_jobs = n_jobs
+
         if verbose:
             logging.basicConfig(level=logging.INFO, format='%(message)s')
+        self.logger = logging.getLogger()
 
-        self.evals, self.orientations = structure_tensor_eig(image=im,
-                                                             d_sigma=d_sigma,
-                                                             n_sigma=n_sigma,
-                                                             mode=gaussmode,
-                                                             cval=cval,
-                                                             n=n,
-                                                             verbose=verbose)
+        self.S = None
+        self.evals = None
+        self.vectors = None
+        self.westin = None
+        self.fa = None
 
-    def get_anisotropy_index(self, metric='westin'):
-        '''
-        Calculates westin image from the eigenvalues image.
-        Eigenvalues are ordered from smallest to largest, so t1 > t2 > t3.
-        '''
+    def fit(self, img):
+        """Compute structure tensor array.
 
-        # t1 = self.evals[..., 2]  # largest
-        # t2 = self.evals[..., 1]  # middle
-        # t3 = self.evals[..., 0]  # smallest
+        Parameters
+        __________
+        img : ndarray
+            3D image array
 
-        with np.errstate(invalid='ignore'):
-            if metric == 'westin':
-                AI = np.where(self.evals[..., 2] != 0, (self.evals[..., 1] -
-                                                        self.evals[..., 0]) / self.evals[..., 2], np.zeros_like(self.evals[..., 2]))
-            elif metric == 'fa':
-                norm2 = self.evals[..., 2]**2 + \
-                    self.evals[..., 1]**2 + self.evals[..., 0]**2
-                AI = np.where(norm2 != 0,
-                              np.sqrt(((self.evals[..., 2] - self.evals[..., 1])**2 +
-                                       (self.evals[..., 1] - self.evals[..., 0])**2 +
-                                       (self.evals[..., 2] - self.evals[..., 0])**2) / (2 * norm2)),
-                              np.zeros_like(self.evals[..., 2]))
+        """
+        self.S = self._structure_tensor(img)
 
-        return AI
+    def get_vectors(self, img):
+        """Compute structure tensor array and perform eigenanalysis,
+        extracting the local structure orientation vectors along with two
+        confidence metrics: westin and fa (fractional anisotropy).
 
-    def results(self, metric='westin'):
-        '''
-        Quick method to return anisotropy index and orientation vectors
-        '''
-        if self.verbose:
-            logging.info('Calculating FA')
-        return self.get_anisotropy_index(metric=metric), self.orientations
+        Parameters
+        __________
+        img : ndarray
+            3D image array
 
+        Returns
+        _______
+        self.vectors : ndarray
+            4D array, shape = img.shape + (3,). Vector representing the
+            orientation with the smallest change in intensity within a local
+            neighborhood
 
-def structure_tensor_eig(image, d_sigma=15 / 1.2, n_sigma=13 / 1.2,
-                         mode='nearest', cval=0, n=None, verbose=False):
-    '''
-    Returns the eigenvalues and eigenvectors of the structure tensor
-    for an image.
-    '''
+        """
+        if self.S is None:
+            self.S = self._structure_tensor(img)
 
-    if verbose:
-        logging.info('Calculating ST elements')
-    Szz, Szy, Szx, Syy, Syx, Sxx = structure_tensor_elements(
-        image, d_sigma=d_sigma, n_sigma=n_sigma, mode=mode, cval=cval,
-        verbose=verbose)
-
-    S = np.array([[Szz, Szy, Szx],
-                  [Szy, Syy, Syx],
-                  [Szx, Syx, Sxx]])
-
-    # np.linalg.eigh requires shape = (...,3,3)
-    S = np.moveaxis(S, [0, 1], [3, 4])
-
-    if verbose:
         logging.info('Calculating eigenvectors/values')
+        evals = np.zeros(self.S.shape[:4])
+        evectors = np.zeros_like(self.S)
 
-    evals = np.zeros(S.shape[:4])
-    evectors = np.zeros(S.shape)
+        with ProcessPoolExecutor(self.n_jobs) as pool:
+            evals, evectors = zip(
+                *[eig for eig in pool.map(np.linalg.eigh, self.S)])
+        self.evals = np.array(evals)
+        self.vectors = np.array(evectors)[..., 0]
+        self.westin = get_westin(self.evals)
+        self.fa = get_fa(self.evals)
+        return self.vectors
 
-    with ProcessPoolExecutor(n) as pool:
-        evals, evectors = zip(
-            *[eig for eig in pool.map(np.linalg.eigh, S)])
-    return np.array(evals), np.array(evectors)[..., 0]
+    def _structure_tensor(self, img):
+        """
+        Computes the structure tensor array
 
+        Parameters
+        __________
+        img : ndarray
+            3D image array
 
-def structure_tensor_elements(image, d_sigma=15 / 1.2, n_sigma=13 / 1.2,
-                              mode='nearest', cval=0, verbose=False):
-    """
-    Computes the structure tensor elements
-    """
+        """
 
-    image = np.squeeze(image)
-    # prevents overflow for uint8 xray data
-    image = img_as_float(image).astype('float32')
+        img = np.squeeze(img).astype('float32')
 
-    if verbose:
         logging.info('Computing gradient')
-    imz, imy, imx = compute_derivatives(
-        image, d_sigma=d_sigma, mode=mode, cval=cval, verbose=verbose)
+        imz, imy, imx = self._compute_gradient(img)
 
-    if verbose:
         logging.info('Forming ST elements:')
-    # structure tensor
-    if verbose:
+
         logging.info('Szz')
-    Szz = gaussian_filter(imz * imz, n_sigma, mode=mode, cval=cval)
-    if verbose:
+        Szz = gaussian_filter(imz * imz, self.n_sigma, **self.gaussargs)
+
         logging.info('Szy')
-    Szy = gaussian_filter(imz * imy, n_sigma, mode=mode, cval=cval)
-    if verbose:
+        Szy = gaussian_filter(imz * imy, self.n_sigma, **self.gaussargs)
+
         logging.info('Szx')
-    Szx = gaussian_filter(imz * imx, n_sigma, mode=mode, cval=cval)
-    if verbose:
+        Szx = gaussian_filter(imz * imx, self.n_sigma, **self.gaussargs)
+
         logging.info('Syy')
-    Syy = gaussian_filter(imy * imy, n_sigma, mode=mode, cval=cval)
-    if verbose:
+        Syy = gaussian_filter(imy * imy, self.n_sigma, **self.gaussargs)
+
         logging.info('Syx')
-    Syx = gaussian_filter(imy * imx, n_sigma, mode=mode, cval=cval)
-    if verbose:
+        Syx = gaussian_filter(imy * imx, self.n_sigma, **self.gaussargs)
+
         logging.info('Sxx')
-    Sxx = gaussian_filter(imx * imx, n_sigma, mode=mode, cval=cval)
+        Sxx = gaussian_filter(imx * imx, self.n_sigma, **self.gaussargs)
 
-    return Szz, Szy, Szx, Syy, Syx, Sxx
+        S = np.array([[Szz, Szy, Szx],
+                      [Szy, Syy, Syx],
+                      [Szx, Syx, Sxx]])
 
+        # np.linalg.eigh requires shape = (...,3,3)
+        S = np.moveaxis(S, [0, 1], [3, 4])
 
-def compute_derivatives(image, d_sigma=15 / 1.2, mode='nearest', cval=0,
-                        verbose=False):
-    """
-    Compute derivatives in row, column and plane directions using convolution
-    with Gaussian partial derivatives
-    """
+        return S
 
-    if verbose:
+    def _compute_gradient(self, img):
+        """
+        Computes the 3D image gradient using convolution with Gaussian
+        partial derivatives
+
+        Parameters
+        __________
+        img : ndarray
+            3D image array
+
+        """
+
         logging.info('Imz')
-    imz = gaussian_filter(
-        image, d_sigma, order=[1, 0, 0], mode=mode, cval=cval)
-    if verbose:
-        logging.info('Imy')
-    imy = gaussian_filter(
-        image, d_sigma, order=[0, 1, 0], mode=mode, cval=cval)
-    if verbose:
-        logging.info('Imx')
-    imx = gaussian_filter(
-        image, d_sigma, order=[0, 0, 1], mode=mode, cval=cval)
+        imz = gaussian_filter(img, self.d_sigma, order=[1, 0, 0],
+                              **self.gaussargs)
 
-    return imz, imy, imx
+        logging.info('Imy')
+        imy = gaussian_filter(img, self.d_sigma, order=[0, 1, 0],
+                              **self.gaussargs)
+
+        logging.info('Imx')
+        imx = gaussian_filter(img, self.d_sigma, order=[0, 0, 1],
+                              **self.gaussargs)
+
+        return imz, imy, imx

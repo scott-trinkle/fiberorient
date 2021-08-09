@@ -2,6 +2,49 @@ import numpy as np
 from skimage import io
 
 
+def get_fa(evals):
+    '''
+    Calculates westin image from the eigenvalues image.
+    Eigenvalues are ordered from smallest to largest, so t1 > t2 > t3.
+    '''
+
+    if evals is None:
+        raise ValueError('StructureTensor has not been fit')
+
+    t2 = evals[..., 2]  # largest
+    t1 = evals[..., 1]  # middle
+    t0 = evals[..., 0]  # smallest
+
+    with np.errstate(invalid='ignore'):
+        norm2 = t2**2 + t1**2 + t0**2
+        fa = np.where(norm2 != 0,
+                      np.sqrt(((t2 - t1)**2 +
+                               (t1 - t0)**2 +
+                               (t2 - t0)**2) /
+                              (2 * norm2)),
+                      np.zeros_like(t2))
+
+    return fa
+
+
+def get_westin(evals):
+    '''
+    Calculates westin image from the eigenvalues image.
+    Eigenvalues are ordered from smallest to largest, so t1 > t2 > t3.
+    '''
+
+    if evals is None:
+        raise ValueError('StructureTensor has not been fit')
+
+    t2 = evals[..., 2]  # largest
+    t1 = evals[..., 1]  # middle
+    t0 = evals[..., 0]  # smallest
+
+    with np.errstate(invalid='ignore'):
+        westin = np.where(t2 != 0, (t1 - t0) / t2, np.zeros_like(t2))
+    return westin
+
+
 def imread(fn):
     return io.imread(fn)
 
