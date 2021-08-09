@@ -1,4 +1,5 @@
 import numpy as np
+from dipy.core.sphere import Sphere
 
 
 def get_westin(evals):
@@ -69,3 +70,55 @@ def split_comps(vectors):
     v1 = vectors[..., 1]
     v2 = vectors[..., 2]
     return v0, v1, v2
+
+
+def make_sphere(n):
+    '''Returns dipy Sphere object with n points determined using Fibonacci
+    Sampling with `n` "equally" spaced points on a unit sphere in
+    spherical coordinates. http://stackoverflow.com/a/26127012/5854689
+
+    Parameters
+    __________
+    n : int
+        Number of points on the sphere
+
+    Returns
+    _______
+    sphere : dipy Sphere object
+    '''
+
+    z = np.linspace(1 - 1 / n, -1 + 1 / n, num=n)
+    polar = np.arccos(z)
+    azim = np.mod((np.pi * (3.0 - np.sqrt(5.0))) *
+                  np.arange(n), 2 * np.pi) - np.pi
+    azim[azim < 0] += 2 * np.pi  # sph_harm functions require azim in [0, 2pi]
+
+    sphere = Sphere(theta=polar, phi=azim)
+    return sphere
+
+
+def cart_to_spherical(vectors):
+    '''Takes [...,3] ndarray of vectors and returns flat lists of
+    polar and azim values in spherical coordinates.
+
+    Parameters
+    __________
+    vectors : ndarray, shape=(N,3)
+        Array of vectors
+
+    Returns
+    _______
+    polar : ndarray
+        Array of polar angles in [0,pi]
+    azim : ndarray
+        Array of azimuth angle in [0,2pi]
+
+    '''
+
+    v0, v1, v2 = split_comps(vectors)
+    r = np.sqrt(v0**2 + v1**2 + v2**2)
+    polar = np.arccos(v2 / r)  # z / r
+    azim = np.arctan2(v1, v0)  # y / x
+    azim[azim < 0] += 2 * np.pi  # sph_harm functions require azim in [0,2pi]
+
+    return polar, azim
