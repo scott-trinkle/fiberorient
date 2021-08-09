@@ -3,7 +3,7 @@ import logging
 import numpy as np
 from scipy.ndimage import gaussian_filter
 from concurrent.futures import ProcessPoolExecutor
-from .util import get_westin, get_fa
+from .util import get_westin
 
 
 class StructureTensor(object):
@@ -61,8 +61,8 @@ class StructureTensor(object):
 
     def get_vectors(self, img):
         """Compute structure tensor array and perform eigenanalysis,
-        extracting the local structure orientation vectors along with two
-        confidence metrics: westin and fa (fractional anisotropy).
+        extracting the local structure orientation vectors along with an
+        orientation confidence metric
 
         Parameters
         __________
@@ -89,8 +89,7 @@ class StructureTensor(object):
                 *[eig for eig in pool.map(np.linalg.eigh, self.S)])
         self.evals = np.array(evals)
         self.vectors = np.array(evectors)[..., 0]
-        self.westin = get_westin(self.evals)
-        self.fa = get_fa(self.evals)
+        self.confidence = get_westin(self.evals)
         return self.vectors
 
     def _structure_tensor(self, img):
