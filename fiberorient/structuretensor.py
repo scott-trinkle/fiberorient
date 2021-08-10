@@ -45,8 +45,7 @@ class StructureTensor(object):
         self.S = None
         self.evals = None
         self.vectors = None
-        self.westin = None
-        self.fa = None
+        self.confidence = None
 
     def fit(self, img):
         """Compute structure tensor array.
@@ -90,6 +89,7 @@ class StructureTensor(object):
         self.evals = np.array(evals)
         self.vectors = np.array(evectors)[..., 0]
         self.confidence = get_westin(self.evals)
+        logging.info('Done!')
         return self.vectors
 
     def _structure_tensor(self, img):

@@ -6,8 +6,7 @@ this_directory = path.abspath(path.dirname(__file__))
 with open(path.join(this_directory, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 
-DEPENDENCIES = ['numpy', 'scikit-image',
-                'scipy', 'scikit-learn', 'dipy']
+DEPENDENCIES = ['numpy', 'scipy', 'scikit-learn', 'dipy', 'fury']
 
 setup(name='fiberorient',
       version='0.1',

@@ -21,13 +21,14 @@ def img_to_dec(img, vectors):
         3D RGB image
 
     '''
-    vectors = rescale(vectors)  # check between 0-1
+    vectors = abs(vectors)  # +- symmetry
+    vectors /= vectors.max()
     scalar = rescale(img, scale=255)
     dec = (np.expand_dims(scalar, -1) * vectors).astype(np.uint8)
     return dec
 
 
-def show_vectors_2D(img, vectors, certainty, max_length=0.25,
+def show_vectors_2D(img, vectors, scale=None, max_length=0.25,
                     linewidth=2, min_pix=1000, offset=-0.25,
                     interactive=False, out_path=None):
     '''Visualizes 2D image data with vectors at each pixel.
@@ -38,7 +39,7 @@ def show_vectors_2D(img, vectors, certainty, max_length=0.25,
         2D image array
     vectors : ndarray, shape=(n1,n2,3)
         2D vector array
-    certainty : ndarray, shape=(n1,n2) or None
+    scale : ndarray, shape=(n1,n2) or None
         Used to scale vectors. If None: scale all by 1.0
     max_length : float, default=0.25
         Maximum length of vectors
@@ -66,12 +67,12 @@ def show_vectors_2D(img, vectors, certainty, max_length=0.25,
         raise ValueError('img must be 2D')
     if vectors.ndim != 3:
         raise ValueError('vectors must be 3D')
-    if certainty is None:
-        certainty = np.ones_like(img)
-    elif certainty.ndim != 2:
+    if scale is None:
+        scale = np.ones_like(img)
+    elif scale.ndim != 2:
         raise ValueError('certainty must be 2D or None')
 
-    certainty /= certainty.max()
+    scale /= scale.max()
 
     ny, nx = img.shape
     if ny <= nx:
@@ -84,10 +85,10 @@ def show_vectors_2D(img, vectors, certainty, max_length=0.25,
 
     img = np.expand_dims(img, -1)
     vectors = np.expand_dims(vectors, (2, 3))
-    certainty = max_length * np.expand_dims(certainty, (2, 3))
+    scale = max_length * np.expand_dims(scale, (2, 3))
 
     scene = window.Scene()
-    vecs_actor = actor.peak_slicer(vectors, certainty,
+    vecs_actor = actor.peak_slicer(vectors, scale,
                                    colors=None,
                                    linewidth=linewidth)
     aff = np.eye(4)
