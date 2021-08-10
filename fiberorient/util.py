@@ -122,3 +122,25 @@ def cart_to_spherical(vectors):
     azim[azim < 0] += 2 * np.pi  # sph_harm functions require azim in [0,2pi]
 
     return polar, azim
+
+
+def _prep_vectors(vectors):
+    '''Utility function to takes in array of direction coordinates and
+    make all x-coordinates positive and sorted by x
+
+    Parameters
+    __________
+    vectors : ndarray, shape=(...,3)
+        Array of vectors
+
+    Returns
+    _______
+    vectors : ndarray, shape=(...,3)
+        Array of vectors, sorted for comparison
+
+    '''
+
+    vectors[vectors[..., 0] < 0] *= -1  # make all x's positive
+    if vectors.ndim > 1:
+        vectors = vectors[vectors[..., 0].argsort()]  # sort by x
+    return vectors

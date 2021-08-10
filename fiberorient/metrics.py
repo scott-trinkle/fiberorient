@@ -1,26 +1,5 @@
 import numpy as np
-
-
-def prep_vectors(vectors):
-    '''Utility function to takes in array of direction coordinates and
-    make all x-coordinates positive and sorted by x
-
-    Parameters
-    __________
-    vectors : ndarray, shape=(...,3)
-        Array of vectors
-
-    Returns
-    _______
-    vectors : ndarray, shape=(...,3)
-        Array of vectors, sorted for comparison
-
-    '''
-
-    vectors[vectors[..., 0] < 0] *= -1  # make all x's positive
-    if vectors.ndim > 1:
-        vectors = vectors[vectors[..., 0].argsort()]  # sort by x
-    return vectors
+from .util import _prep_vectors
 
 
 def angular_distance(vectors0, vectors1):
@@ -41,8 +20,8 @@ def angular_distance(vectors0, vectors1):
     '''
 
     # Sort peaks
-    vectors0 = prep_vectors(vectors0)
-    vectors1 = prep_vectors(vectors1)
+    vectors0 = _prep_vectors(vectors0)
+    vectors1 = _prep_vectors(vectors1)
 
     # Calculate angle in degrees
     ang = np.arccos((vectors0 * vectors1).sum(axis=-1)) * 180 / np.pi
