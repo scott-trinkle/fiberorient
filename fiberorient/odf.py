@@ -98,6 +98,8 @@ class ODF:
         self.delta = delta
         self.n_bins = n_bins
 
+        self.n_coef = int(((self.degree * 2 + 3)**2 - 1) / 8)
+
         if degree % 2 != 0:
             raise ValueError('degree must be even')
         if precompute & delta:
@@ -108,11 +110,18 @@ class ODF:
             raise ValueError('n_bins must be None for delta method')
 
         if self.precompute:
-            self.sh_pre = np.load(data_path + 'sh_deg20_n6500.npy')
+            self.sh_pre = np.load(
+                data_path + 'sh_deg20_n6500.npy')[:self.n_coef]
             self.n_bins = 6500
 
-        self.mn = get_SH_loop_ind(self.degree)
+        self._mn_sym = get_SH_loop_ind(self.degree)
         self.coef = None
+
+        mn = []
+        for n in range(0, degree+1, 2):
+            for m in range(-n, n+1):
+                mn.append((n, m))
+        self.mn = np.array(mn)
 
     def fit(self, vectors, K=None):
         '''Perform even, real SH transform, compute SH coefficients
@@ -138,13 +147,14 @@ class ODF:
             self._fit_hist_pre(vectors, K)
         else:
             self._fit_hist(vectors, K)
+        return self
 
     def _fit_delta(self, vectors, K):
         '''SH transform treating vectors as sum of delta functions'''
         polar, azim = cart_to_spherical(vectors)
         c = []
         app = c.append
-        for m, n in self.mn:
+        for m, n in self._mn_sym:
             if m == 0:
                 app(real_sph_harm(m, n, polar, azim).sum() / K)
             else:
@@ -165,7 +175,7 @@ class ODF:
         sphere = make_sphere(self.n_bins)
         c = []
         app = c.append
-        for m, n in self.mn:
+        for m, n in self._mn_sym:
             if m == 0:
                 app((hist * real_sph_harm(m, n,
                                           sphere.theta, sphere.phi)).sum() / K)
@@ -175,7 +185,7 @@ class ODF:
                 app(math.sqrt(2) * (hist * pos).sum() / K)
         self.coef = np.array(c)
 
-    def to_odf(self, sphere):
+    def to_sphere(self, sphere):
         '''Calculates ODF as a linear combination of real SH functions
         evaluated on sample points defined by sphere.
 
@@ -196,7 +206,7 @@ class ODF:
 
         odf = np.zeros(sphere.phi.size)
         i = 0
-        for m, n in self.mn:
+        for m, n in self._mn_sym:
             if m == 0:
                 odf += self.coef[i] * \
                     real_sph_harm(m, n, sphere.theta, sphere.phi)

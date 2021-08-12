@@ -57,6 +57,7 @@ class StructureTensor(object):
 
         """
         self.S = self._structure_tensor(img)
+        return self
 
     def get_vectors(self, img):
         """Compute structure tensor array and perform eigenanalysis,
