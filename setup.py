@@ -17,7 +17,18 @@ setup(name='fiberorient',
       author='Scott Trinkle',
       author_email='tscott.trinkle@gmail.com',
       license='MIT',
+      keywords=['structure tensor', 'orientation', 'ODF'],
       packages=['fiberorient'],
       package_dir={'fiberorient': 'fiberorient'},
       package_data={'fiberorient': ['data/*']},
-      install_requires=DEPENDENCIES)
+      install_requires=DEPENDENCIES,
+      classifiers=[
+          'Development Status :: 3 - Alpha',
+          'Intended Audience :: Developers',
+          'Topic :: Software Development :: Build Tools',
+          'License :: OSI Approved :: MIT License',
+          'Programming Language :: Python :: 3.6',
+          'Programming Language :: Python :: 3.7',
+          'Programming Language :: Python :: 3.8',
+          'Programming Language :: Python :: 3.9'
+      ])
