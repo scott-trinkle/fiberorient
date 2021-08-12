@@ -5,17 +5,22 @@
 fiberorient is a package for performing structure tensor analysis and
 calculating orientation distribution functions from 3D imaging data.
 
-Code, data, and examples stem from work published as: 
+Code and methodology stem from work published as: 
 
 Trinkle, S., Foxley, S., Kasthuri, N., La Rivière, P., “[Synchrotron x-ray
 micro-CT as a validation dataset for diffusion mri in whole mouse
 brain](https://doi.org/https://doi.org/10.1002/mrm.28776),” Magnetic Resonance
 in Medicine, vol. 86, no. 2, pp. 1067–1076, 2021.
 
-For more information, see [my blog
-post](https://www.scotttrinkle.com/news/microct-paper/).
+For more information, see [my blog post](https://www.scotttrinkle.com/news/microct-paper/).
 
 ## Installation
+
+fiberorient can be installed with pip:
+
+```
+pip install fiberorient
+```
 
 For local installation, first clone the repo:
 
@@ -31,20 +36,35 @@ and run (preferably in a virtual environment):
 
 ## Usage
 
-Coming soon!
+The primary utility of fiberorient is estimating the orientation of local 
+structures in 3D imaging data using structure tensor analysis:
 
-### Axis convention
+```
+from fiberorient import StructureTensor
 
-Assume the shape of the input data is `(n0, n1, n2)`. Each orientation output from
-the structure tensor analysis pipeline will be a 3D vector `vec` with `vec[0]`
-along the n0 direction, `vec[1]` along the n1 direction, and `vec[2]` along the
-n2 direction. 
+img = np.load('img_data')  # some 3D image data
+st = StructureTensor(d_sigma=1, n_sigma=3)
+st.fit(img)
+vectors = st.get_vectors(img)
+```
 
-For expansion onto spherical harmonics and visualization with the fury package,
-it is convenient to define these dimensions as a right-handed coordinate system
-with `(n0,n1,n2)` corresponding to `(x,y,z)`, where the polar angle $(0,\pi)$ is
-formed by cos$^{-1}$(z) and the azimuth $(0,2\pi)$ is formed by tan$^{-1}$(y/x).
+fiberorient is also used to express groups of vectors as orientation 
+distribution functions (ODFs) on a basis of real, even spherical harmonic
+functions:
 
-## Data
+```
+from fiberorient.odf import ODF
+from fiberorient.util import make_sphere
 
-Coming soon!
+odf = ODF(degree=8)
+odf.fit(vectors)
+
+sphere = make_sphere(3000)
+odf_on_sphere = odf.to_sphere(sphere)
+```
+
+The package also includes a number of utilities in the `vis` module for generating
+useful data visualizations, as well as metrics for comparing arrays of vectors
+and ODFs in the `metrics` module.
+
+Further examples are available as Jupyter notebooks in `examples/`
