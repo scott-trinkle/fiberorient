@@ -9,12 +9,12 @@ with open(path.join(this_directory, 'README.md'), encoding='utf-8') as f:
 DEPENDENCIES = ['numpy', 'scipy', 'scikit-learn', 'dipy', 'fury']
 
 setup(name='fiberorient',
-      version='0.1',
+      version='0.2',
       description='Tools for 3D structure tensor analysis',
       long_description=long_description,
       long_description_content_type='text/markdown',
       url='https://github.com/scott-trinkle/fiberorient',
-      download_url='https://github.com/scott-trinkle/fiberorient/archive/refs/tags/v_01.tar.gz',
+      download_url='https://github.com/scott-trinkle/fiberorient/archive/refs/tags/v0.2.tar.gz',
       author='Scott Trinkle',
       author_email='tscott.trinkle@gmail.com',
       license='MIT',
