@@ -8,7 +8,7 @@ def angular_distance(vectors0, vectors1):
 
     Parameters
     __________
-    vectors0, vectors 1 : ndarray, shape=(...,3)
+    vectors0, vectors 1 : ndarray, shape=(N,3)
         Array of vectors to compare
 
     Returns

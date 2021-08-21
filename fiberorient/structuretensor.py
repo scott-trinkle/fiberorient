@@ -3,7 +3,6 @@ import logging
 import numpy as np
 from scipy.ndimage import gaussian_filter
 from concurrent.futures import ProcessPoolExecutor
-from .util import get_westin
 
 
 class StructureTensor(object):
@@ -48,38 +47,16 @@ class StructureTensor(object):
         self.confidence = None
 
     def fit(self, img):
-        """Compute structure tensor array.
+        """Compute structure tensor array and perform eigenanalysis, extracting the
+        local structure orientation vectors along with an orientation confidence
+        metric
 
         Parameters
         __________
         img : ndarray
             3D image array
-
         """
         self.S = self._structure_tensor(img)
-        return self
-
-    def get_vectors(self, img):
-        """Compute structure tensor array and perform eigenanalysis,
-        extracting the local structure orientation vectors along with an
-        orientation confidence metric
-
-        Parameters
-        __________
-        img : ndarray
-            3D image array
-
-        Returns
-        _______
-        self.vectors : ndarray
-            4D array, shape = img.shape + (3,). Vector representing the
-            orientation with the smallest change in intensity within a local
-            neighborhood
-
-        """
-        if self.S is None:
-            self.S = self._structure_tensor(img)
-
         logging.info('Calculating eigenvectors/values')
         evals = np.zeros(self.S.shape[:4])
         evectors = np.zeros_like(self.S)
@@ -89,9 +66,10 @@ class StructureTensor(object):
                 *[eig for eig in pool.map(np.linalg.eigh, self.S)])
         self.evals = np.array(evals)
         self.vectors = np.array(evectors)[..., 0]
-        self.confidence = get_westin(self.evals)
+        self.confidence = self._get_westin()
         logging.info('Done!')
-        return self.vectors
+
+        return self
 
     def _structure_tensor(self, img):
         """
@@ -163,3 +141,26 @@ class StructureTensor(object):
                               **self.gaussargs)
 
         return imz, imy, imx
+
+    def _get_westin(self):
+        '''
+        Calculates westin certainty metric for orientations.
+
+        Parameters
+        __________
+        evals : ndarray, shape = (...,3)
+            Array of eigenvalues of structure tensors
+
+        Returns
+        _______
+        westin : ndarray
+            Array of westin certainty values
+        '''
+
+        t2 = self.evals[..., 2]  # largest
+        t1 = self.evals[..., 1]  # middle
+        t0 = self.evals[..., 0]  # smallest
+
+        with np.errstate(invalid='ignore'):
+            westin = np.where(t2 != 0, (t1 - t0) / t2, np.zeros_like(t2))
+        return westin

@@ -2,30 +2,6 @@ import numpy as np
 from dipy.core.sphere import Sphere
 
 
-def get_westin(evals):
-    '''
-    Calculates westin certainty metric for orientations.
-
-    Parameters
-    __________
-    evals : ndarray, shape = (...,3)
-        Array of eigenvalues of structure tensors
-
-    Returns
-    _______
-    westin : ndarray
-        Array of westin certainty values
-    '''
-
-    t2 = evals[..., 2]  # largest
-    t1 = evals[..., 1]  # middle
-    t0 = evals[..., 0]  # smallest
-
-    with np.errstate(invalid='ignore'):
-        westin = np.where(t2 != 0, (t1 - t0) / t2, np.zeros_like(t2))
-    return westin
-
-
 def rescale(arr, scale=1.0):
     '''
     Rescales an array from 0 to `scale`
@@ -44,9 +20,7 @@ def rescale(arr, scale=1.0):
 
     '''
 
-    dtype = arr.dtype
-    rescaled = (scale * (arr - arr.min()) /
-                (arr.max() - arr.min())).astype(dtype)
+    rescaled = scale * (arr - arr.min()) / (arr.max() - arr.min())
     return rescaled
 
 

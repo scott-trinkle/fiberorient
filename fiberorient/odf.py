@@ -92,27 +92,26 @@ class ODF:
         Calculate SH transform by first binning vectors into angular histogram
     '''
 
-    def __init__(self, degree, precompute=True, delta=False, n_bins=None):
+    def __init__(self, degree, method='precompute'):
+
         self.degree = degree
-        self.precompute = precompute
-        self.delta = delta
-        self.n_bins = n_bins
+        if degree % 2 != 0:
+            raise ValueError('degree must be even')
 
         self.n_coef = int(((self.degree * 2 + 3)**2 - 1) / 8)
 
-        if degree % 2 != 0:
-            raise ValueError('degree must be even')
-        if precompute & delta:
-            raise ValueError('Cannot use delta method with precompute')
-        if precompute & (n_bins is not None):
-            raise ValueError('n_bins must be None for precompute')
-        if delta & (n_bins is not None):
-            raise ValueError('n_bins must be None for delta method')
-
-        if self.precompute:
+        if method == 'precompute':
             self.sh_pre = np.load(
                 data_path + 'sh_deg20_n6500.npy')[:self.n_coef]
             self.n_bins = 6500
+        elif method == 'delta':
+            self.n_bins = None
+        elif type(method) == int:
+            self.n_bins = method
+        else:
+            raise ValueError('Invalid method')
+
+        self.method = method
 
         self._mn_sym = get_SH_loop_ind(self.degree)
         self.coef = None
@@ -141,9 +140,9 @@ class ODF:
         if K is None:
             K = vectors.shape[0]
 
-        if self.delta:
+        if self.method == 'delta':
             self._fit_delta(vectors, K)
-        elif self.precompute:
+        elif self.method == 'precompute':
             self._fit_hist_pre(vectors, K)
         else:
             self._fit_hist(vectors, K)
@@ -244,8 +243,9 @@ class ODF:
         return hist
 
 
-def _precompute_SH(N=6500, degree=20):
+def _precompute_SH(N=6500, degree=20, path=None):
     '''Utility function to precompute SH functions on grid of 6500 points.'''
+
     sphere = make_sphere(N)
     mn = get_SH_loop_ind(degree)
     num_coeffs = int(((degree * 2 + 3)**2 - 1) / 8)
@@ -261,4 +261,7 @@ def _precompute_SH(N=6500, degree=20):
             count += 1
             sh[count] = math.sqrt(2) * pos
             count += 1
-            np.save(data_path + 'sh_deg{}_n{}'.format(degree, N), sh)
+    if path is not None:
+        np.save(path + 'sh_deg{}_n{}'.format(degree, N), sh)
+    else:
+        return sh
