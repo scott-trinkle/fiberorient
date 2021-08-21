@@ -1,5 +1,7 @@
 # fiberorient
 
+[![codecov](https://codecov.io/gh/scott-trinkle/fiberorient/branch/main/graph/badge.svg?token=NFRST1OCT2)](https://codecov.io/gh/scott-trinkle/fiberorient)
+
 ![](imgs/demo.png)
 
 fiberorient is a package for performing structure tensor analysis and
